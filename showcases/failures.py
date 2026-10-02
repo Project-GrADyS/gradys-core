@@ -8,6 +8,7 @@ from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.errors import ProtocolSetUpException
 from gradys_core.protocol import BaseProtocol
 
+from .checks import check
 from .mock_environment import MockEnvironment
 
 
@@ -31,27 +32,28 @@ class LifecycleOnly(BaseProtocol):
 
 
 def main() -> None:
+    print("Failures: missing capabilities")
     without_mobility = MockEnvironment(mobility=False)
     movement = NeedsMovement()
     try:
         without_mobility.bind(movement)
     except ProtocolSetUpException as error:
-        print(f"binding rejected missing command: {error}")
+        check("GotoCoords" in error.message, "missing command rejects binding")
     else:
         raise AssertionError("Binding should reject GotoCoords")
-    assert without_mobility.executed == []
+    check(without_mobility.executed == [], "rejected protocol executes nothing")
 
     try:
         movement.move.send(GotoCoords(4.0, 5.0, 6.0))
-    except RuntimeError as error:
-        print(f"failed connection rejects use: {error}")
+    except RuntimeError:
+        check(True, "rejected protocol is unusable")
     else:
         raise AssertionError("A failed connection should reject commands")
 
     try:
         MockEnvironment(mobility=False).bind(NeedsPosition())
     except ProtocolSetUpException as error:
-        print(f"binding rejected missing event: {error}")
+        check("PositionUpdate" in error.message, "missing event rejects binding")
     else:
         raise AssertionError("Binding should reject PositionUpdate")
 
@@ -60,7 +62,7 @@ def main() -> None:
     try:
         lifecycle.require_event(PositionUpdate)
     except ProtocolSetUpException as error:
-        print(f"later requirement rejected: {error}")
+        check("PositionUpdate" in error.message, "missing requirement after binding is rejected")
     else:
         raise AssertionError("A later missing requirement should be rejected")
 

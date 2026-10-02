@@ -7,6 +7,7 @@ from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.protocol import BaseProtocol
 
+from .checks import check
 from .mock_environment import MockEnvironment
 
 
@@ -26,22 +27,20 @@ class MoveProtocol(BaseProtocol):
 
 
 def main() -> None:
+    print("Binding: constructor requirements, events and commands")
     environment = MockEnvironment()
     protocol = MoveProtocol((1.0, 2.0, 3.0))
 
     environment.bind(protocol)
-    assert environment.executed == []  # Injection accepts the command; startup executes it.
+    check(environment.executed == [], "commands wait until start")
     environment.start()
-    assert protocol.notifications == ["started", "position: (1.0, 2.0, 3.0)"]
+    check(protocol.notifications == ["started", "position: (1.0, 2.0, 3.0)"],
+          "start delivers lifecycle and position events")
 
-    # Requirements made after binding are checked immediately and remain usable.
     later_move = protocol.require_command(GotoCoords)
     later_move.send(GotoCoords(4.0, 5.0, 6.0))
-    assert protocol.notifications[-1] == "position: (4.0, 5.0, 6.0)"
-
-    for notification in protocol.notifications:
-        print(notification)
-    print(f"executed commands: {len(environment.executed)}")
+    check(protocol.notifications[-1] == "position: (4.0, 5.0, 6.0)", "requirement after binding works")
+    check(len(environment.executed) == 2, "every command executes")
 
 
 if __name__ == "__main__":
