@@ -12,7 +12,6 @@ from .mock_environment import MockEnvironment
 
 class MoveProtocol(BaseProtocol):
     def __init__(self, destination: tuple[float, float, float]) -> None:
-        super().__init__()
         self.notifications: list[str] = []
         self.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         self.require_event(PositionUpdate).subscribe(self.on_position)
