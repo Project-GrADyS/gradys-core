@@ -7,7 +7,7 @@ name = "gradys-core"
 version = "0.1.0"
 description = "Shared, extensible, statically-typed protocol interface for GrADyS-SIM NextGen and gradys-embedded"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 keywords = ["gradys", "protocol", "simulation", "drone", "uav", "LAC", "PUC"]
 classifiers = [
@@ -48,7 +48,7 @@ follow_imports = "skip"
 follow_imports_for_stubs = true
 
 [tool.pyright]
-pythonVersion = "3.10"
+pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportUnnecessaryTypeIgnoreComment = "error"
 include = ["src", "tests"]
