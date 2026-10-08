@@ -3,19 +3,19 @@
 from gradys_core.command import BaseCommand, CommandHandle
 from gradys_core.event import BaseEvent, EventHandle
 
-from .connection import InjectionPackage, _Connection
+from .connection import InjectionPackage, Connection
 
 
 class BaseProtocol:
-    _connection_instance: _Connection | None = None
+    _connection_instance: Connection | None = None
 
     @property
-    def _connection(self) -> _Connection:
+    def _connection(self) -> Connection:
         """
         Get the connection instance, creating it if it doesn't exist yet.
         """
         if self._connection_instance is None:
-            self._connection_instance = _Connection()
+            self._connection_instance = Connection()
         return self._connection_instance
 
     def require_command[C: BaseCommand](self, command_type: type[C]) -> CommandHandle[C]:

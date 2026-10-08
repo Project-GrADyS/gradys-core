@@ -109,7 +109,7 @@ class _FailedConnection:
 type _ConnectionState = _PendingConnection | _ConnectedConnection | _FailedConnection
 
 
-class _Connection:
+class Connection:
     """Stable target for handles while the protocol changes connection state."""
 
     def __init__(self) -> None:
