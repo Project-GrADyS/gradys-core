@@ -4,7 +4,7 @@ from .event import BaseEvent
 from .error_messages import invalid_event_type, invalid_event_base_class
 
 
-def environment_event(event_class: type[BaseEvent]):
+def environment_event[E: BaseEvent](event_class: type[E]) -> type[E]:
     """
     Decorator to mark a class as an environment event. All environment events must be decorated with this decorator
     to be recognized as valid events in the simulation environment. Only classes that inherit from BaseEvent can be
