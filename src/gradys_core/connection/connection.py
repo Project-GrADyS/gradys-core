@@ -6,6 +6,7 @@ work after injection without exposing partially completed setup.
 """
 
 from __future__ import annotations
+from typing import Any, Callable
 
 from gradys_core.command import BaseCommand
 from gradys_core.environment import Environment
@@ -15,14 +16,25 @@ from .binding import (
     validate_command_type,
     validate_event_type,
 )
+from .subscription import Subscriber
 
+class _ConnectionSubscription[E: BaseEvent]:
+    """A subscription to an event type in an environment."""
+    def __init__(self, unsubscribe: Callable[[], None], event_type: type[E], handler: EventHandler[E]) -> None:
+        self.unsubscribe_impl = unsubscribe
+        self.event_type = event_type
+        self.handler = handler
+
+    def unsubscribe(self) -> None:
+        """Unregister the subscription from the environment."""
+        self.unsubscribe_impl()
 
 class _PendingConnection:
     """Collect protocol requests until an environment is available."""
 
     def __init__(self) -> None:
         self.commands: list[BaseCommand] = []
-        self.subscriptions: list[tuple[type[BaseEvent], EventHandler[BaseEvent]]] = []
+        self.subscriptions: list[_ConnectionSubscription[Any]] = []
         self.command_requirements: set[type[BaseCommand]] = set()
         self.event_requirements: set[type[BaseEvent]] = set()
 
@@ -35,20 +47,32 @@ class _PendingConnection:
     def send(self, command: BaseCommand) -> None:
         self.commands.append(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> None:
+    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> _ConnectionSubscription[E]:
         # The pair retains the relationship between the event type and its handler.
-        self.subscriptions.append((event, handler))
+        subscription = _ConnectionSubscription(lambda: self.subscriptions.remove(subscription), event, handler)
+        self.subscriptions.append(subscription)
+        return subscription
 
     def connect(self, environment: Environment) -> _ConnectedConnection:
-        connected = _ConnectedConnection(environment)
-        for command_type in self.command_requirements:
-            connected.require_command(command_type)
-        for event_type in self.event_requirements:
-            connected.require_event(event_type)
-        for event, handler in self.subscriptions:
-            connected.subscribe(event, handler)
-        for command in self.commands:
-            connected.send(command)
+        try:
+            connected = _ConnectedConnection(environment)
+            for command_type in self.command_requirements:
+                connected.require_command(command_type)
+            for event_type in self.event_requirements:
+                connected.require_event(event_type)
+            for subscription in self.subscriptions:
+                new_sub = connected.subscribe(subscription.event_type, subscription.handler)
+                # Update the unsubscribe implemementation for the subscription object that was already handed out
+                subscription.unsubscribe_impl = new_sub.unsubscribe
+            for command in self.commands:
+                connected.send(command)
+        except:
+            # Invalidate subscriptions in case of failure
+            def _raise() -> None:
+                raise RuntimeError("Protocol injection failed. Create a new protocol instance.")
+            for subscription in self.subscriptions:
+                subscription.unsubscribe_impl = _raise
+            raise
 
         return connected
 
@@ -68,8 +92,9 @@ class _ConnectedConnection:
     def send(self, command: BaseCommand) -> None:
         self._environment.command_sender(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> None:
-        self._environment.event_subscriber(event, handler)
+    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> _ConnectionSubscription[E]:
+        callback = self._environment.event_subscriber(event, handler)
+        return _ConnectionSubscription(callback, event, handler)
 
 
 class _FailedConnection:
@@ -88,14 +113,15 @@ class _FailedConnection:
     def send(self, _command: BaseCommand) -> None:
         self._raise()
 
-    def subscribe[E: BaseEvent](self, _event: type[E], _handler: EventHandler[E]) -> None:
+    def subscribe[E: BaseEvent](self, _event: type[E], _handler: EventHandler[E]) -> _ConnectionSubscription[E]:
         self._raise()
+        return _ConnectionSubscription(lambda: None, _event, _handler)
 
 
 type _ConnectionState = _PendingConnection | _ConnectedConnection | _FailedConnection
 
 
-class Connection:
+class Connection(Subscriber):
     """Stable target for handles while the protocol changes connection state."""
 
     def __init__(self) -> None:
@@ -110,8 +136,8 @@ class Connection:
     def send(self, command: BaseCommand) -> None:
         self._state.send(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> None:
-        self._state.subscribe(event, handler)
+    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> _ConnectionSubscription[E]:
+        return self._state.subscribe(event, handler)
 
     def inject(self, environment: Environment) -> None:
         if not isinstance(self._state, _PendingConnection):

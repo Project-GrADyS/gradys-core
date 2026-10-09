@@ -1,6 +1,6 @@
 """Structural interface between an execution environment and a connection."""
 
-from typing import Protocol
+from typing import Callable, Protocol
 
 from gradys_core.command import BaseCommand
 from gradys_core.event import BaseEvent, EventHandler
@@ -23,8 +23,13 @@ class Environment(Protocol):
 
     def event_subscriber[E: BaseEvent](
         self, event_type: type[E], handler: EventHandler[E], /
-    ) -> None:
-        """Register a handler for the matching event type."""
+    ) -> Callable[[], None]:
+        """
+        Register a handler for the matching event type.
+
+        Returns:
+            A callable that, when invoked, unregisters the handler.
+        """
         ...
 
     def event_checker(self, event_type: type[BaseEvent], /) -> bool:

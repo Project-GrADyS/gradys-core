@@ -28,7 +28,7 @@ class BaseProtocol:
     def require_event[E: BaseEvent](self, event_type: type[E]) -> EventHandle[E]:
         """Require an event capability and return its subscription handle."""
         self._connection.require_event(event_type)
-        return EventHandle(event_type, self._connection.subscribe)
+        return EventHandle(event_type, self._connection)
 
     def _inject(self, environment: Environment) -> None:
         """Attach an environment; the environment controls startup readiness."""

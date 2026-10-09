@@ -3,6 +3,7 @@
 from typing import Callable
 
 from gradys_core.command import BaseCommand
+from gradys_core.connection import Subscriber, Subscription
 from gradys_core.event import BaseEvent, EventHandler
 
 
@@ -29,9 +30,10 @@ class EventHandle[E: BaseEvent]:
     subscribe to events of the specified type from the environment.
     """
 
-    def __init__(self, event: type[E], subscribe: Callable[[type[E], EventHandler[E]], None]):
+    def __init__(self, event: type[E], subscriber: Subscriber):
         self._event = event
-        self._subscribe = subscribe
+        self._subscriber = subscriber
 
-    def subscribe(self, handler: EventHandler[E]) -> None:
-        self._subscribe(self._event, handler)
+
+    def subscribe(self, handler: EventHandler[E]) -> Subscription:
+        return self._subscriber.subscribe(self._event, handler)
