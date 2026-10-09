@@ -6,7 +6,7 @@ work after injection without exposing partially completed setup.
 """
 
 from __future__ import annotations
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from gradys_core.command import BaseCommand
 from gradys_core.environment import Environment
@@ -16,14 +16,19 @@ from .binding import (
     validate_command_type,
     validate_event_type,
 )
-from .subscription import Subscriber
+from .subscription import Subscriber, SubscriptionOption
 
 class _ConnectionSubscription[E: BaseEvent]:
     """A subscription to an event type in an environment."""
-    def __init__(self, unsubscribe: Callable[[], None], event_type: type[E], handler: EventHandler[E]) -> None:
+    def __init__(self, 
+                 unsubscribe: Callable[[], None], 
+                 event_type: type[E], 
+                 handler: EventHandler[E],
+                 options: SubscriptionOption) -> None:
         self.unsubscribe_impl = unsubscribe
         self.event_type = event_type
         self.handler = handler
+        self.options = options
 
     def unsubscribe(self) -> None:
         """Unregister the subscription from the environment."""
@@ -47,9 +52,13 @@ class _PendingConnection:
     def send(self, command: BaseCommand) -> None:
         self.commands.append(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> _ConnectionSubscription[E]:
+    def subscribe[E: BaseEvent](self, 
+                                event: type[E], 
+                                handler: EventHandler[E],
+                                options: SubscriptionOption) -> _ConnectionSubscription[E]:
         # The pair retains the relationship between the event type and its handler.
-        subscription = _ConnectionSubscription(lambda: self.subscriptions.remove(subscription), event, handler)
+        subscription = _ConnectionSubscription(
+            lambda: self.subscriptions.remove(subscription), event, handler, options)
         self.subscriptions.append(subscription)
         return subscription
 
@@ -61,7 +70,7 @@ class _PendingConnection:
             for event_type in self.event_requirements:
                 connected.require_event(event_type)
             for subscription in self.subscriptions:
-                new_sub = connected.subscribe(subscription.event_type, subscription.handler)
+                new_sub = connected.subscribe(subscription.event_type, subscription.handler, subscription.options)
                 # Update the unsubscribe implemementation for the subscription object that was already handed out
                 subscription.unsubscribe_impl = new_sub.unsubscribe
             for command in self.commands:
@@ -92,9 +101,31 @@ class _ConnectedConnection:
     def send(self, command: BaseCommand) -> None:
         self._environment.command_sender(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> _ConnectionSubscription[E]:
-        callback = self._environment.event_subscriber(event, handler)
-        return _ConnectionSubscription(callback, event, handler)
+    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E], options: SubscriptionOption) -> _ConnectionSubscription[E]:
+        unsubscription_callback: Optional[Callable[[], None]] = None
+        has_been_called = False
+        if options.once:
+            # Wrapping original handler to unsubscribe after first invocation
+            original_handler = handler
+            def once_callback(event: E) -> None:
+                nonlocal has_been_called, unsubscription_callback
+                if has_been_called:
+                    return
+
+                has_been_called = True
+                if unsubscription_callback is not None:
+                    unsubscription_callback()
+
+                original_handler(event)
+            handler = once_callback
+        
+        unsubscription_callback = self._environment.event_subscriber(event, handler)
+
+        # If registration delivered an event, cleanup had to wait for its return value.
+        if options.once and has_been_called:
+            unsubscription_callback()
+
+        return _ConnectionSubscription(unsubscription_callback, event, handler, options)
 
 
 class _FailedConnection:
@@ -113,9 +144,9 @@ class _FailedConnection:
     def send(self, _command: BaseCommand) -> None:
         self._raise()
 
-    def subscribe[E: BaseEvent](self, _event: type[E], _handler: EventHandler[E]) -> _ConnectionSubscription[E]:
+    def subscribe[E: BaseEvent](self, _event: type[E], _handler: EventHandler[E], _options: SubscriptionOption) -> _ConnectionSubscription[E]:
         self._raise()
-        return _ConnectionSubscription(lambda: None, _event, _handler)
+        return _ConnectionSubscription(lambda: None, _event, _handler, _options)
 
 
 type _ConnectionState = _PendingConnection | _ConnectedConnection | _FailedConnection
@@ -136,8 +167,13 @@ class Connection(Subscriber):
     def send(self, command: BaseCommand) -> None:
         self._state.send(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> _ConnectionSubscription[E]:
-        return self._state.subscribe(event, handler)
+    def subscribe[E: BaseEvent](self, 
+                                event: type[E], 
+                                handler: EventHandler[E], 
+                                options: Optional[SubscriptionOption] = None) -> _ConnectionSubscription[E]:
+        if options is None:
+            options = SubscriptionOption()
+        return self._state.subscribe(event, handler, options)
 
     def inject(self, environment: Environment) -> None:
         if not isinstance(self._state, _PendingConnection):
