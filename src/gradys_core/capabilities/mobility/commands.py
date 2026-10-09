@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from gradys_core.command import BaseCommand, CommandId
+from gradys_core.primitives import BaseCommand, CommandId
 
 
 @dataclass(frozen=True, slots=True)

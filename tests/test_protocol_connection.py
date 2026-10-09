@@ -2,8 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from gradys_core.command import BaseCommand
-from gradys_core.event import BaseEvent, EventHandler
+from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
 from gradys_core.protocol import BaseProtocol
 
 

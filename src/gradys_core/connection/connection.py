@@ -8,9 +8,8 @@ work after injection without exposing partially completed setup.
 from __future__ import annotations
 from typing import Any, Callable, Optional
 
-from gradys_core.command import BaseCommand
 from gradys_core.environment import Environment
-from gradys_core.event import BaseEvent, EventHandler
+from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
 
 from .binding import (
     validate_command_type,

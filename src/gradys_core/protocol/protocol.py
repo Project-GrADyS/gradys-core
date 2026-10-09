@@ -1,9 +1,8 @@
 """User-facing protocol base class."""
 
-from gradys_core.command import BaseCommand
 from gradys_core.connection import Connection
 from gradys_core.environment import Environment
-from gradys_core.event import BaseEvent
+from gradys_core.primitives import BaseCommand, BaseEvent
 
 from .handles import CommandHandle, EventHandle
 

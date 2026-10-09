@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
-from gradys_core.event import BaseEvent, EventHandler
+from gradys_core.primitives import BaseEvent, EventHandler
 
 
 class Subscription(Protocol):

@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from gradys_core.event import BaseEvent, EventId, environment_event
+from gradys_core.primitives import BaseEvent, EventId, environment_event
 
 
 @environment_event

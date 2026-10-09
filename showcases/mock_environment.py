@@ -10,8 +10,7 @@ from typing import cast
 
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
-from gradys_core.command import BaseCommand
-from gradys_core.event import BaseEvent
+from gradys_core.primitives import BaseCommand, BaseEvent
 from gradys_core.protocol import BaseProtocol
 
 

@@ -1,9 +1,8 @@
 """Validate protocol requirements against an environment's capabilities."""
 
-from gradys_core.command import BaseCommand
 from gradys_core.environment import Environment
 from gradys_core.errors import ProtocolSetUpException
-from gradys_core.event import BaseEvent
+from gradys_core.primitives import BaseCommand, BaseEvent
 
 
 def validate_command_type(environment: Environment, command_type: type[BaseCommand]) -> None:

@@ -2,8 +2,7 @@
 
 from typing import Callable, Protocol
 
-from gradys_core.command import BaseCommand
-from gradys_core.event import BaseEvent, EventHandler
+from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
 
 
 class Environment(Protocol):

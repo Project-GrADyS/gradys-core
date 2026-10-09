@@ -2,10 +2,9 @@ from typing import Callable, cast
 
 import pytest
 
-from gradys_core.command import BaseCommand
 from gradys_core.connection import Connection
 from gradys_core.connection.subscription import SubscriptionOption
-from gradys_core.event import BaseEvent, EventHandler
+from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
 
 
 class Notice(BaseEvent):
