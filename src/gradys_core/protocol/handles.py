@@ -1,10 +1,10 @@
 """Typed command and event primitives used by protocol implementations."""
 
-from typing import Callable, Optional
+from typing import Optional
 
-from gradys_core.connection import Subscriber, Subscription
-from gradys_core.connection.subscription import SubscriptionOption
-from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
+from gradys_core.connection import Sender, Subscriber, Subscription
+from gradys_core.connection.subscriber import SubscriptionOption
+from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler, BaseQuery
 
 
 class CommandHandle[C: BaseCommand]:
@@ -14,14 +14,14 @@ class CommandHandle[C: BaseCommand]:
     type can be sent.
     """
 
-    def __init__(self, command_type: type[C], sender: Callable[[C], None]) -> None:
+    def __init__(self, command_type: type[C], sender: Sender) -> None:
         self._command = command_type
         self._sender = sender
 
     def send(self, command: C) -> None:
         if not isinstance(command, self._command):
             raise TypeError(f"Command must be of type {self._command.__name__}, got {type(command).__name__}")
-        self._sender(command)
+        self._sender.send(command)
 
 
 class EventHandle[E: BaseEvent]:

@@ -15,7 +15,8 @@ from .binding import (
     validate_command_type,
     validate_event_type,
 )
-from .subscription import Subscriber, SubscriptionOption
+from .sender import Sender
+from .subscriber import Subscriber, SubscriptionOption
 
 class _ConnectionSubscription[E: BaseEvent]:
     """A subscription to an event type in an environment."""
@@ -151,7 +152,7 @@ class _FailedConnection:
 type _ConnectionState = _PendingConnection | _ConnectedConnection | _FailedConnection
 
 
-class Connection(Subscriber):
+class Connection(Sender, Subscriber):
     """Stable target for handles while the protocol changes connection state."""
 
     def __init__(self) -> None:

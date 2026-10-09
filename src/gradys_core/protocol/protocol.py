@@ -22,7 +22,7 @@ class BaseProtocol:
     def require_command[C: BaseCommand](self, command_type: type[C]) -> CommandHandle[C]:
         """Require a command capability and return its sending handle."""
         self._connection.require_command(command_type)
-        return CommandHandle(command_type, self._connection.send)
+        return CommandHandle(command_type, self._connection)
 
     def require_event[E: BaseEvent](self, event_type: type[E]) -> EventHandle[E]:
         """Require an event capability and return its subscription handle."""
