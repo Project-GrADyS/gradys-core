@@ -1,6 +1,6 @@
 """A minimal environment used by the runnable showcases.
 
-The environment declares capabilities, builds an InjectionPackage, and decides when
+The environment declares capabilities, implements the Environment interface, and decides when
 accepted commands execute. It is deliberately small, not a simulator implementation.
 """
 
@@ -12,7 +12,7 @@ from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.command import BaseCommand
 from gradys_core.event import BaseEvent
-from gradys_core.protocol import BaseProtocol, InjectionPackage
+from gradys_core.protocol import BaseProtocol
 
 
 class MobilityHandler:
@@ -47,14 +47,15 @@ class MockEnvironment:
 
     def bind(self, protocol: BaseProtocol) -> None:
         """Validate capabilities and connect a protocol to this environment."""
-        protocol._inject(InjectionPackage(
-            command_sender=self.send,
-            command_checker=lambda command_type: command_type in self._command_handlers,
-            event_subscriber=self.subscribe,
-            event_checker=lambda event_type: event_type in self._event_types,
-        ))
+        protocol._inject(self)
 
-    def subscribe[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> None:
+    def command_checker(self, command_type: type[BaseCommand]) -> bool:
+        return command_type in self._command_handlers
+
+    def event_checker(self, event_type: type[BaseEvent]) -> bool:
+        return event_type in self._event_types
+
+    def event_subscriber[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> None:
         # Event type and handler stay paired; storage erases only the generic type.
         self._subscribers[event_type].append(cast(Callable[[BaseEvent], None], handler))
 
@@ -62,7 +63,7 @@ class MockEnvironment:
         for handler in tuple(self._subscribers[type(event)]):
             handler(event)
 
-    def send(self, command: BaseCommand) -> None:
+    def command_sender(self, command: BaseCommand) -> None:
         """Accept a command; execution waits until the environment starts."""
         self._pending_commands.append(command)
         if self._running:

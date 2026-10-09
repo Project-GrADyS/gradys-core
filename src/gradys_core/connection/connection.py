@@ -1,34 +1,20 @@
 """The protocol's connection to an execution environment.
 
-Handles keep a reference to ``_Connection`` throughout their lifetime. The object
+Handles keep a reference to ``Connection`` throughout their lifetime. The object
 delegates to one of three states, so a handle made during construction continues to
 work after injection without exposing partially completed setup.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import cast
-
-from gradys_core.command import BaseCommand, CommandSender
-from gradys_core.event import BaseEvent, EventHandler, EventSubscriber
+from gradys_core.command import BaseCommand
+from gradys_core.environment import Environment
+from gradys_core.event import BaseEvent, EventHandler
 
 from .binding import (
-    CommandCapabilityChecker,
-    EventCapabilityChecker,
     validate_command_type,
     validate_event_type,
 )
-
-
-@dataclass
-class InjectionPackage:
-    """Functions supplied by the environment to service one protocol."""
-
-    command_sender: CommandSender[BaseCommand]
-    command_checker: CommandCapabilityChecker
-    event_subscriber: EventSubscriber
-    event_checker: EventCapabilityChecker
 
 
 class _PendingConnection:
@@ -53,8 +39,8 @@ class _PendingConnection:
         # The pair retains the relationship between the event type and its handler.
         self.subscriptions.append((event, handler))
 
-    def connect(self, package: InjectionPackage) -> _ConnectedConnection:
-        connected = _ConnectedConnection(package)
+    def connect(self, environment: Environment) -> _ConnectedConnection:
+        connected = _ConnectedConnection(environment)
         for command_type in self.command_requirements:
             connected.require_command(command_type)
         for event_type in self.event_requirements:
@@ -70,20 +56,20 @@ class _PendingConnection:
 class _ConnectedConnection:
     """Forward protocol requests to the injected environment."""
 
-    def __init__(self, package: InjectionPackage) -> None:
-        self._package = package
+    def __init__(self, environment: Environment) -> None:
+        self._environment = environment
 
     def require_command(self, command_type: type[BaseCommand]) -> None:
-        validate_command_type(self._package.command_checker, command_type)
+        validate_command_type(self._environment, command_type)
 
     def require_event(self, event_type: type[BaseEvent]) -> None:
-        validate_event_type(self._package.event_checker, event_type)
+        validate_event_type(self._environment, event_type)
 
     def send(self, command: BaseCommand) -> None:
-        self._package.command_sender(command)
+        self._environment.command_sender(command)
 
     def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> None:
-        self._package.event_subscriber(event, handler)
+        self._environment.event_subscriber(event, handler)
 
 
 class _FailedConnection:
@@ -127,13 +113,13 @@ class Connection:
     def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E]) -> None:
         self._state.subscribe(event, handler)
 
-    def inject(self, package: InjectionPackage) -> None:
+    def inject(self, environment: Environment) -> None:
         if not isinstance(self._state, _PendingConnection):
             raise RuntimeError("Protocol has already been injected.")
 
         pending = self._state
         try:
-            self._state = pending.connect(package)
+            self._state = pending.connect(environment)
         except BaseException:
             # Environment callbacks may already have had effects; never retry them.
             self._state = _FailedConnection()

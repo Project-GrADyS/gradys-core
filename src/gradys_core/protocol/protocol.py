@@ -1,9 +1,11 @@
 """User-facing protocol base class."""
 
-from gradys_core.command import BaseCommand, CommandHandle
-from gradys_core.event import BaseEvent, EventHandle
+from gradys_core.command import BaseCommand
+from gradys_core.connection import Connection
+from gradys_core.environment import Environment
+from gradys_core.event import BaseEvent
 
-from .connection import InjectionPackage, Connection
+from .handles import CommandHandle, EventHandle
 
 
 class BaseProtocol:
@@ -28,6 +30,6 @@ class BaseProtocol:
         self._connection.require_event(event_type)
         return EventHandle(event_type, self._connection.subscribe)
 
-    def _inject(self, package: InjectionPackage) -> None:
-        """Attach environment functions; the environment controls startup readiness."""
-        self._connection.inject(package)
+    def _inject(self, environment: Environment) -> None:
+        """Attach an environment; the environment controls startup readiness."""
+        self._connection.inject(environment)

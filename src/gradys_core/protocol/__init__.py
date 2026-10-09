@@ -1,5 +1,6 @@
-from .protocol import BaseProtocol
-from .connection import InjectionPackage
-from .binding import CommandCapabilityChecker, EventCapabilityChecker
+"""Primitives for implementing distributed algorithm behavior."""
 
-__all__ = ["BaseProtocol", "InjectionPackage", "CommandCapabilityChecker", "EventCapabilityChecker"]
+from .handles import CommandHandle, EventHandle
+from .protocol import BaseProtocol
+
+__all__ = ["BaseProtocol", "CommandHandle", "EventHandle"]

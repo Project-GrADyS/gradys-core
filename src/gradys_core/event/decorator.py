@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from gradys_core.event import BaseEvent
+from .event import BaseEvent
 from .error_messages import invalid_event_type, invalid_event_base_class
 
 
