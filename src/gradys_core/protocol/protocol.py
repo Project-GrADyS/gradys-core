@@ -1,11 +1,15 @@
 """User-facing protocol base class."""
+from typing import Protocol
 
 from gradys_core.connection import Connection
 from gradys_core.environment import Environment
 from gradys_core.primitives import BaseCommand, BaseEvent
 
-from .handles import CommandHandle, EventHandle
+from .handles import CommandHandle, EventHandle, QueryHandle
 
+class _QueryDefinition[C: BaseCommand, R: BaseEvent](Protocol):
+    @classmethod
+    def query_types(cls) -> tuple[type[C], type[R]]: ...
 
 class BaseProtocol:
     _connection_instance: Connection | None = None
@@ -28,6 +32,13 @@ class BaseProtocol:
         """Require an event capability and return its subscription handle."""
         self._connection.require_event(event_type)
         return EventHandle(event_type, self._connection)
+
+    def require_query[C: BaseCommand, R: BaseEvent](self, query_type: type[_QueryDefinition[C, R]]) -> QueryHandle[C, R]:
+        """Require a query capability and return its sending handle."""
+        command_type, response_type = query_type.query_types()
+        self._connection.require_command(command_type)
+        self._connection.require_event(response_type)
+        return QueryHandle(command_type, response_type, self._connection)
 
     def _inject(self, environment: Environment) -> None:
         """Attach an environment; the environment controls startup readiness."""

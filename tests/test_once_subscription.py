@@ -3,7 +3,7 @@ from typing import Callable, cast
 import pytest
 
 from gradys_core.connection import Connection
-from gradys_core.connection.subscriber import SubscriptionOption
+from gradys_core.connection.subscriber import SubscriptionOptions
 from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
 
 
@@ -55,7 +55,7 @@ def test_once_cleans_up_for_both_delivery_timings(immediate: bool, before_inject
 
     if not before_injection:
         connection.inject(environment)
-    connection.subscribe(Notice, received.append, SubscriptionOption(once=True))
+    connection.subscribe(Notice, received.append, SubscriptionOptions(once=True))
     if before_injection:
         connection.inject(environment)
 

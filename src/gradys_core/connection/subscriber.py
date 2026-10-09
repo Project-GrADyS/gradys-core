@@ -16,7 +16,7 @@ class Subscription(Protocol):
         ...
 
 @dataclass(frozen=True, slots=True)
-class SubscriptionOption:
+class SubscriptionOptions:
     """Options for a subscription to an event type in an environment."""
 
     once: bool = False
@@ -31,5 +31,5 @@ class Subscriber(Protocol):
     def subscribe[E: BaseEvent](self, 
                                 event: type[E], 
                                 handler: EventHandler[E], 
-                                options: Optional[SubscriptionOption] = None) -> Subscription:
+                                options: Optional[SubscriptionOptions] = None) -> Subscription:
         ...

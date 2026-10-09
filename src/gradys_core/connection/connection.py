@@ -16,7 +16,7 @@ from .binding import (
     validate_event_type,
 )
 from .sender import Sender
-from .subscriber import Subscriber, SubscriptionOption
+from .subscriber import Subscriber, SubscriptionOptions
 
 class _ConnectionSubscription[E: BaseEvent]:
     """A subscription to an event type in an environment."""
@@ -24,7 +24,7 @@ class _ConnectionSubscription[E: BaseEvent]:
                  unsubscribe: Callable[[], None], 
                  event_type: type[E], 
                  handler: EventHandler[E],
-                 options: SubscriptionOption) -> None:
+                 options: SubscriptionOptions) -> None:
         self.unsubscribe_impl = unsubscribe
         self.event_type = event_type
         self.handler = handler
@@ -55,7 +55,7 @@ class _PendingConnection:
     def subscribe[E: BaseEvent](self, 
                                 event: type[E], 
                                 handler: EventHandler[E],
-                                options: SubscriptionOption) -> _ConnectionSubscription[E]:
+                                options: SubscriptionOptions) -> _ConnectionSubscription[E]:
         # The pair retains the relationship between the event type and its handler.
         subscription = _ConnectionSubscription(
             lambda: self.subscriptions.remove(subscription), event, handler, options)
@@ -101,7 +101,7 @@ class _ConnectedConnection:
     def send(self, command: BaseCommand) -> None:
         self._environment.command_sender(command)
 
-    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E], options: SubscriptionOption) -> _ConnectionSubscription[E]:
+    def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E], options: SubscriptionOptions) -> _ConnectionSubscription[E]:
         unsubscription_callback: Optional[Callable[[], None]] = None
         has_been_called = False
         if options.once:
@@ -144,7 +144,7 @@ class _FailedConnection:
     def send(self, _command: BaseCommand) -> None:
         self._raise()
 
-    def subscribe[E: BaseEvent](self, _event: type[E], _handler: EventHandler[E], _options: SubscriptionOption) -> _ConnectionSubscription[E]:
+    def subscribe[E: BaseEvent](self, _event: type[E], _handler: EventHandler[E], _options: SubscriptionOptions) -> _ConnectionSubscription[E]:
         self._raise()
         return _ConnectionSubscription(lambda: None, _event, _handler, _options)
 
@@ -170,9 +170,9 @@ class Connection(Sender, Subscriber):
     def subscribe[E: BaseEvent](self, 
                                 event: type[E], 
                                 handler: EventHandler[E], 
-                                options: Optional[SubscriptionOption] = None) -> _ConnectionSubscription[E]:
+                                options: Optional[SubscriptionOptions] = None) -> _ConnectionSubscription[E]:
         if options is None:
-            options = SubscriptionOption()
+            options = SubscriptionOptions()
         return self._state.subscribe(event, handler, options)
 
     def inject(self, environment: Environment) -> None:

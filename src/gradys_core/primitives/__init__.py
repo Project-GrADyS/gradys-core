@@ -9,6 +9,7 @@ from .event import (
     is_environment_event,
     validate_environment_event,
 )
+from .query import BaseQuery
 
 __all__ = [
     "BaseCommand",
@@ -19,4 +20,5 @@ __all__ = [
     "environment_event",
     "is_environment_event",
     "validate_environment_event",
+    "BaseQuery",
 ]
