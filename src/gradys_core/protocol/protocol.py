@@ -1,15 +1,10 @@
 """User-facing protocol base class."""
-from typing import Protocol
 
 from gradys_core.connection import Connection
 from gradys_core.environment import Environment
-from gradys_core.primitives import BaseCommand, BaseEvent
+from gradys_core.primitives import BaseCommand, BaseEvent, QueryDefinition
 
 from .handles import CommandHandle, EventHandle, QueryHandle
-
-class _QueryDefinition[C: BaseCommand, R: BaseEvent](Protocol):
-    @classmethod
-    def query_types(cls) -> tuple[type[C], type[R]]: ...
 
 class BaseProtocol:
     _connection_instance: Connection | None = None
@@ -33,7 +28,7 @@ class BaseProtocol:
         self._connection.require_event(event_type)
         return EventHandle(event_type, self._connection)
 
-    def require_query[C: BaseCommand, R: BaseEvent](self, query_type: type[_QueryDefinition[C, R]]) -> QueryHandle[C, R]:
+    def require_query[C: BaseCommand, R: BaseEvent](self, query_type: type[QueryDefinition[C, R]]) -> QueryHandle[C, R]:
         """Require a query capability and return its sending handle."""
         command_type, response_type = query_type.query_types()
         self._connection.require_command(command_type)
