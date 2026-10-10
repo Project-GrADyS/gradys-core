@@ -1,3 +1,5 @@
+"""Pair query commands with the event types that carry their responses."""
+
 import abc
 from typing import Protocol, Self
 
@@ -5,6 +7,13 @@ from gradys_core.primitives import BaseCommand, BaseEvent
 
 
 class BaseQuery[E: BaseEvent](BaseCommand, abc.ABC):
+    """Base for a command whose response is an event of type ``E``.
+
+    Concrete queries supply a ``command_id``, payload, and ``response_type``.
+    This pairing enables typed query handles; it does not provide request IDs,
+    response correlation, or delivery guarantees.
+    """
+
     @classmethod
     def query_types(cls) -> tuple[type[Self], type[E]]:
         """Expose the concrete query and its response together for type inference."""
@@ -13,14 +22,13 @@ class BaseQuery[E: BaseEvent](BaseCommand, abc.ABC):
     @classmethod
     @abc.abstractmethod
     def response_type(cls) -> type[E]:
-        """Returns the type of the event that is expected in response to this query."""
+        """Return the event class expected in response to this query command."""
         ...
 
 
 class QueryDefinition[C: BaseCommand, R: BaseEvent](Protocol):
-    """
-    A protocol for defining a query with a specific command and response type.
-    This exists to facilitate type-checking of the query and its response.
-    """
+    """Structural pairing of a command type ``C`` and response event type ``R``."""
     @classmethod
-    def query_types(cls) -> tuple[type[C], type[R]]: ...
+    def query_types(cls) -> tuple[type[C], type[R]]:
+        """Return the command class and its response event class, in that order."""
+        ...

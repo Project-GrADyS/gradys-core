@@ -1,10 +1,14 @@
+"""Exceptions raised while binding protocol requirements to an environment."""
+
+
 class ProtocolSetUpException(Exception):
-    """Exception raised for errors in the setup process.
+    """Report an unsupported command or event capability.
 
     Attributes:
-        message -- explanation of the error
+        message: Explanation of the rejected requirement.
     """
 
     def __init__(self, message: str):
+        """Store the capability failure message as the exception's text."""
         self.message = message
         super().__init__(self.message)

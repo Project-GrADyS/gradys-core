@@ -18,16 +18,41 @@ class MobilityHandler:
     """Accept movement requests and publish position observations."""
 
     commands = frozenset({GotoCoords})
+    """Command classes handled by this example mobility implementation."""
     events = frozenset({PositionUpdate})
+    """Event classes this handler can publish."""
 
     def handle(self, command: BaseCommand, emit: Callable[[BaseEvent], None]) -> None:
+        """Turn a movement command into an immediate position update.
+
+        This example reports the destination without simulating motion.
+
+        Args:
+            command: Movement request to execute.
+            emit: Callback used to publish the resulting position event.
+
+        Raises:
+            TypeError: If the command is not a ``GotoCoords`` instance.
+        """
         if not isinstance(command, GotoCoords):
             raise TypeError(f"Unsupported mobility command: {type(command).__name__}")
         emit(PositionUpdate(command.x, command.y, command.z))
 
 
 class MockEnvironment:
+    """Queue commands until startup and dispatch exact event types synchronously.
+
+    This showcase adapter demonstrates capability checks and execution timing.
+    Its ``event_subscriber`` does not return an unsubscription callback, so it
+    does not satisfy the full ``Environment`` contract and cannot demonstrate
+    cancellation or one-shot cleanup.
+
+    Attributes:
+        executed: Commands removed from the queue for execution, in order.
+    """
+
     def __init__(self, *, mobility: bool = True) -> None:
+        """Create a stopped environment, optionally exposing mobility support."""
         self._handlers = [MobilityHandler()] if mobility else []
         self._command_handlers: dict[type[BaseCommand], MobilityHandler] = {
             command_type: handler
@@ -49,16 +74,24 @@ class MockEnvironment:
         protocol._inject(self)
 
     def command_checker(self, command_type: type[BaseCommand]) -> bool:
+        """Return whether this exact command class has a registered handler."""
         return command_type in self._command_handlers
 
     def event_checker(self, event_type: type[BaseEvent]) -> bool:
+        """Return whether this exact event class is advertised by the environment."""
         return event_type in self._event_types
 
     def event_subscriber[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> None:
+        """Append a handler for exact-type delivery without cancellation support."""
         # Event type and handler stay paired; storage erases only the generic type.
         self._subscribers[event_type].append(cast(Callable[[BaseEvent], None], handler))
 
     def emit(self, event: BaseEvent) -> None:
+        """Deliver to a snapshot of exact-type handlers in registration order.
+
+        Newly registered handlers wait for a later emission. Handler exceptions
+        propagate immediately and stop the current delivery loop.
+        """
         for handler in tuple(self._subscribers[type(event)]):
             handler(event)
 
@@ -69,6 +102,13 @@ class MockEnvironment:
             self._drain()
 
     def start(self) -> None:
+        """Emit initialization, mark the runtime running, and drain queued commands.
+
+        Commands sent by initialization handlers join the queue before draining.
+
+        Raises:
+            RuntimeError: If the environment is already running.
+        """
         if self._running:
             raise RuntimeError("Environment has already started.")
         self.emit(SimulationInitializationEvent())
@@ -76,6 +116,11 @@ class MockEnvironment:
         self._drain()
 
     def _drain(self) -> None:
+        """Execute queued commands in order, including commands added by callbacks.
+
+        The guard lets the outer loop handle reentrant sends without recursive
+        draining. Reset it even when execution or event delivery raises.
+        """
         if self._draining:
             return
         self._draining = True

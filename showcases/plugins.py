@@ -22,12 +22,26 @@ from .mock_environment import MockEnvironment
 
 
 class MovementPlugin:
+    """Add mobility requirements and position handling to a supplied protocol.
+
+    Attributes:
+        notifications: Position descriptions received by this plugin.
+        move: Command handle obtained through the owning protocol.
+    """
+
     def __init__(
         self,
         protocol: BaseProtocol,
         destination: tuple[float, float, float],
         log: list[str] | None = None,
     ) -> None:
+        """Subscribe to positions and queue movement through the owning protocol.
+
+        Args:
+            protocol: Protocol whose requirements and connection the plugin uses.
+            destination: Cartesian destination for the initial movement command.
+            log: Optional shared list recording protocol/plugin delivery order.
+        """
         self.notifications: list[str] = []
         self._log = log
         protocol.require_event(PositionUpdate).subscribe(self.on_position)
@@ -35,6 +49,7 @@ class MovementPlugin:
         self.move.send(GotoCoords(*destination))
 
     def on_position(self, event: PositionUpdate) -> None:
+        """Record an observation and append it to the shared log when supplied."""
         notification = f"position: ({event.x}, {event.y}, {event.z})"
         self.notifications.append(notification)
         if self._log is not None:
@@ -42,21 +57,36 @@ class MovementPlugin:
 
 
 class LifecycleProtocol(BaseProtocol):
-    """Requires only lifecycle events; mobility comes entirely from the plugin."""
+    """Require lifecycle events directly and mobility through a plugin.
+
+    Attributes:
+        notifications: Initialization notifications received by the protocol.
+        plugin: Plugin whose mobility requirements join this protocol's own.
+    """
 
     def __init__(self) -> None:
+        """Queue initialization handling and construct a plugin on this protocol."""
         self.notifications: list[str] = []
         self.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         self.plugin = MovementPlugin(self, (1.0, 2.0, 3.0))
 
     def on_start(self, event: SimulationInitializationEvent) -> None:
+        """Record the environment's initialization notification."""
         self.notifications.append("started")
 
 
 class SharedMovementProtocol(BaseProtocol):
-    """Requires the same event and command as its plugin."""
+    """Require the same mobility event and command as an attached plugin.
+
+    Attributes:
+        notifications: Lifecycle and position descriptions received here.
+        log: Shared protocol/plugin log used to demonstrate delivery order.
+        move: Protocol's sending handle for movement commands.
+        plugin: Plugin with its own handlers and a handle on the same connection.
+    """
 
     def __init__(self) -> None:
+        """Queue the protocol's subscriptions and movement before the plugin's."""
         self.notifications: list[str] = []
         self.log: list[str] = []  # Shared with the plugin to record delivery order.
         self.require_event(SimulationInitializationEvent).subscribe(self.on_start)
@@ -66,15 +96,18 @@ class SharedMovementProtocol(BaseProtocol):
         self.plugin = MovementPlugin(self, (4.0, 5.0, 6.0), self.log)
 
     def on_start(self, event: SimulationInitializationEvent) -> None:
+        """Record initialization before the environment executes queued movement."""
         self.notifications.append("started")
 
     def on_position(self, event: PositionUpdate) -> None:
+        """Record a position locally and in the shared delivery-order log."""
         notification = f"position: ({event.x}, {event.y}, {event.z})"
         self.notifications.append(notification)
         self.log.append(f"protocol {notification}")
 
 
 def disjoint() -> None:
+    """Check that plugin requirements join the protocol's binding requirements."""
     print("Disjoint: plugin adds mobility to a lifecycle-only protocol")
     environment = MockEnvironment()
     protocol = LifecycleProtocol()
@@ -102,6 +135,7 @@ def disjoint() -> None:
 
 
 def intersection() -> None:
+    """Check shared capabilities, command order, and delivery to both subscribers."""
     print("\nIntersection: protocol and plugin share PositionUpdate and GotoCoords")
     environment = MockEnvironment()
     protocol = SharedMovementProtocol()
@@ -131,6 +165,7 @@ def intersection() -> None:
 
 
 def main() -> None:
+    """Run the disjoint and overlapping plugin requirement demonstrations."""
     disjoint()
     intersection()
 

@@ -13,25 +13,39 @@ from .mock_environment import MockEnvironment
 
 
 class NeedsMovement(BaseProtocol):
+    """Require a movement command so an environment without mobility rejects it.
+
+    Attributes:
+        move: Sending handle for the required ``GotoCoords`` command.
+    """
+
     def __init__(self) -> None:
+        """Declare mobility and queue one command before environment binding."""
         super().__init__()
         self.move = self.require_command(GotoCoords)
         self.move.send(GotoCoords(1.0, 2.0, 3.0))
 
 
 class NeedsPosition(BaseProtocol):
+    """Require position events so missing event support rejects binding."""
+
     def __init__(self) -> None:
+        """Declare a position event requirement and queue a no-op subscription."""
         super().__init__()
         self.require_event(PositionUpdate).subscribe(lambda event: None)
 
 
 class LifecycleOnly(BaseProtocol):
+    """Require only the initialization event supported without mobility."""
+
     def __init__(self) -> None:
+        """Declare lifecycle support and queue a no-op initialization handler."""
         super().__init__()
         self.require_event(SimulationInitializationEvent).subscribe(lambda event: None)
 
 
 def main() -> None:
+    """Check rejection of missing capabilities during and after binding."""
     print("Failures: missing capabilities")
     without_mobility = MockEnvironment(mobility=False)
     movement = NeedsMovement()

@@ -1,4 +1,4 @@
-"""Shared command and event types and event definition helpers."""
+"""Shared command, event, and query contracts and event definition helpers."""
 
 from .command import BaseCommand, CommandId
 from .event import (
