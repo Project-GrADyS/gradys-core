@@ -6,6 +6,7 @@ from gradys_core.primitives import BaseCommand, BaseEvent, QueryDefinition
 
 from .handles import CommandHandle, EventHandle, QueryHandle
 
+
 class BaseProtocol:
     _connection_instance: Connection | None = None
 

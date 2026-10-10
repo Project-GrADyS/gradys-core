@@ -3,6 +3,7 @@ from typing import Protocol, Self
 
 from gradys_core.primitives import BaseCommand, BaseEvent
 
+
 class BaseQuery[E: BaseEvent](BaseCommand, abc.ABC):
     @classmethod
     def query_types(cls) -> tuple[type[Self], type[E]]:

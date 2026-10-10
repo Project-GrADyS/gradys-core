@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
+from .error_messages import invalid_event_base_class, invalid_event_type
 from .event import BaseEvent
-from .error_messages import invalid_event_type, invalid_event_base_class
 
 
 def environment_event[E: BaseEvent](event_class: type[E]) -> type[E]:
@@ -20,7 +20,7 @@ def environment_event[E: BaseEvent](event_class: type[E]) -> type[E]:
 
     dataclass_decorator = dataclass(slots=True, frozen=True)
 
-    setattr(event_class, "__is_environment_event__", True)
+    event_class.__is_environment_event__ = True
 
     return dataclass_decorator(event_class)
 

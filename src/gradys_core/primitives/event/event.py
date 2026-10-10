@@ -1,6 +1,7 @@
 """Event definitions shared by protocols and environments."""
 
-from typing import ClassVar, Callable
+from collections.abc import Callable
+from typing import ClassVar
 
 type EventId = str
 

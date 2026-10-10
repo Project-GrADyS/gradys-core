@@ -13,13 +13,13 @@ from .query import BaseQuery, QueryDefinition
 
 __all__ = [
     "BaseCommand",
-    "CommandId",
     "BaseEvent",
+    "BaseQuery",
+    "CommandId",
     "EventHandler",
     "EventId",
+    "QueryDefinition",
     "environment_event",
     "is_environment_event",
     "validate_environment_event",
-    "BaseQuery",
-    "QueryDefinition",
 ]

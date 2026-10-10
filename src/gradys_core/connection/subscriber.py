@@ -1,7 +1,7 @@
 """Subscription interfaces provided by a connection."""
 
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Protocol
 
 from gradys_core.primitives import BaseEvent, EventHandler
 
@@ -31,5 +31,5 @@ class Subscriber(Protocol):
     def subscribe[E: BaseEvent](self, 
                                 event: type[E], 
                                 handler: EventHandler[E], 
-                                options: Optional[SubscriptionOptions] = None) -> Subscription:
+                                options: SubscriptionOptions | None = None) -> Subscription:
         ...

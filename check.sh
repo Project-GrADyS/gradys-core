@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs every gate. All three must pass before a change lands.
+# Runs every gate. All four must pass before a change lands.
 #
 # The static suites are the primary contract: mypy and pyright disagreed on three of the
 # five encodings tried while designing this, so a single checker is not enough. Both
@@ -9,6 +9,10 @@ set -uo pipefail
 cd "$(dirname "$0")"
 status=0
 
+echo "== ruff =="
+python -m ruff check . || status=1
+
+echo
 echo "== pytest =="
 python -m pytest tests/ -q || status=1
 

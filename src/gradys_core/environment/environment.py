@@ -1,6 +1,7 @@
 """Structural interface between an execution environment and a connection."""
 
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
 

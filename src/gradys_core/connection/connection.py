@@ -6,7 +6,9 @@ work after injection without exposing partially completed setup.
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Optional
+
+from collections.abc import Callable
+from typing import Any
 
 from gradys_core.environment import Environment
 from gradys_core.primitives import BaseCommand, BaseEvent, EventHandler
@@ -17,6 +19,7 @@ from .binding import (
 )
 from .sender import Sender
 from .subscriber import Subscriber, SubscriptionOptions
+
 
 class _ConnectionSubscription[E: BaseEvent]:
     """A subscription to an event type in an environment."""
@@ -102,7 +105,7 @@ class _ConnectedConnection:
         self._environment.command_sender(command)
 
     def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E], options: SubscriptionOptions) -> _ConnectionSubscription[E]:
-        unsubscription_callback: Optional[Callable[[], None]] = None
+        unsubscription_callback: Callable[[], None] | None = None
         has_been_called = False
         if options.once:
             # Wrapping original handler to unsubscribe after first invocation
@@ -170,14 +173,14 @@ class Connection(Sender, Subscriber):
     def subscribe[E: BaseEvent](self, 
                                 event: type[E], 
                                 handler: EventHandler[E], 
-                                options: Optional[SubscriptionOptions] = None) -> _ConnectionSubscription[E]:
+                                options: SubscriptionOptions | None = None) -> _ConnectionSubscription[E]:
         if options is None:
             options = SubscriptionOptions()
         return self._state.subscribe(event, handler, options)
 
     def inject(self, environment: Environment) -> None:
         if not isinstance(self._state, _PendingConnection):
-            raise RuntimeError("Protocol has already been injected.")
+            raise TypeError("Protocol has already been injected.")
 
         pending = self._state
         try:

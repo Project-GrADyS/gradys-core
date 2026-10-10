@@ -1,6 +1,6 @@
 """Typed command and event primitives used by protocol implementations."""
 
-from typing import Optional, Protocol
+from typing import Protocol
 
 from gradys_core.connection import Sender, Subscriber, Subscription
 from gradys_core.connection.subscriber import SubscriptionOptions
@@ -34,7 +34,7 @@ class EventHandle[E: BaseEvent]:
         self._event = event_type
         self._subscriber = subscriber
 
-    def subscribe(self, handler: EventHandler[E], *, options: Optional[SubscriptionOptions] = None) -> Subscription:
+    def subscribe(self, handler: EventHandler[E], *, options: SubscriptionOptions | None = None) -> Subscription:
         return self._subscriber.subscribe(self._event, handler, options)
 
 class _SenderSubscriber(Sender, Subscriber, Protocol): ...
