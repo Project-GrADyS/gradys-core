@@ -11,7 +11,6 @@ class Sender(Protocol):
     def send(self, command: BaseCommand) -> None:
         """Accept a command for forwarding to an execution environment.
 
-        Implementations may buffer it until an environment is attached.
         Acceptance does not guarantee that the command has executed.
         """
         ...

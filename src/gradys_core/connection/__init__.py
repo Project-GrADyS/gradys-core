@@ -1,4 +1,4 @@
-"""Connection state and buffering between protocols and environments."""
+"""Synchronous communication between protocols and available environments."""
 
 from .connection import Connection
 from .sender import Sender

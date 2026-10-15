@@ -1,4 +1,4 @@
-"""Capability failures during binding and after binding.
+"""Immediate capability failures through a connected context.
 
 Run from the repository root with ``python -m showcases.failures``.
 """
@@ -6,79 +6,55 @@ Run from the repository root with ``python -m showcases.failures``.
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.errors import ProtocolSetUpException
-from gradys_core.protocol import BaseProtocol
+from gradys_core.protocol import BaseProtocol, ProtocolContext
 
 from .checks import check
 from .mock_environment import MockEnvironment
 
 
 class NeedsMovement(BaseProtocol):
-    """Require a movement command so an environment without mobility rejects it.
+    """Request mobility from the supplied context."""
 
-    Attributes:
-        move: Sending handle for the required ``GotoCoords`` command.
-    """
-
-    def __init__(self) -> None:
-        """Declare mobility and queue one command before environment binding."""
-        super().__init__()
-        self.move = self.require_command(GotoCoords)
-        self.move.send(GotoCoords(1.0, 2.0, 3.0))
+    def run(self, context: ProtocolContext) -> None:
+        """Check movement support before sending a command."""
+        context.require_command(GotoCoords).send(GotoCoords(1.0, 2.0, 3.0))
 
 
 class NeedsPosition(BaseProtocol):
-    """Require position events so missing event support rejects binding."""
+    """Request position observations from the supplied context."""
 
-    def __init__(self) -> None:
-        """Declare a position event requirement and queue a no-op subscription."""
-        super().__init__()
-        self.require_event(PositionUpdate).subscribe(lambda event: None)
+    def run(self, context: ProtocolContext) -> None:
+        """Check event support before registering a handler."""
+        context.require_event(PositionUpdate).subscribe(lambda event: None)
 
 
 class LifecycleOnly(BaseProtocol):
-    """Require only the initialization event supported without mobility."""
+    """Use lifecycle support without requiring mobility."""
 
-    def __init__(self) -> None:
-        """Declare lifecycle support and queue a no-op initialization handler."""
-        super().__init__()
-        self.require_event(SimulationInitializationEvent).subscribe(lambda event: None)
+    def run(self, context: ProtocolContext) -> None:
+        """Register an initialization handler."""
+        context.require_event(SimulationInitializationEvent).subscribe(lambda event: None)
 
 
 def main() -> None:
-    """Check rejection of missing capabilities during and after binding."""
-    print("Failures: missing capabilities")
-    without_mobility = MockEnvironment(mobility=False)
-    movement = NeedsMovement()
-    try:
-        without_mobility.bind(movement)
-    except ProtocolSetUpException as error:
-        check("GotoCoords" in error.message, "missing command rejects binding")
-    else:
-        raise AssertionError("Binding should reject GotoCoords")
-    check(without_mobility.executed == [], "rejected protocol executes nothing")
+    """Check immediate rejection during run and subsequent context use."""
+    environment = MockEnvironment(mobility=False)
+    for protocol, capability in [(NeedsMovement(), "GotoCoords"), (NeedsPosition(), "PositionUpdate")]:
+        try:
+            environment.bind(protocol)
+        except ProtocolSetUpException as error:
+            check(capability in error.message, "missing capability raises immediately")
+        else:
+            raise AssertionError("An unsupported requirement should fail")
+    check(environment.executed == [], "rejected movement was never sent")
 
+    context = environment.bind(LifecycleOnly())
     try:
-        movement.move.send(GotoCoords(4.0, 5.0, 6.0))
-    except RuntimeError:
-        check(True, "rejected protocol is unusable")
-    else:
-        raise AssertionError("A failed connection should reject commands")
-
-    try:
-        MockEnvironment(mobility=False).bind(NeedsPosition())
+        context.require_event(PositionUpdate)
     except ProtocolSetUpException as error:
-        check("PositionUpdate" in error.message, "missing event rejects binding")
+        check("PositionUpdate" in error.message, "later requirements are also validated")
     else:
-        raise AssertionError("Binding should reject PositionUpdate")
-
-    lifecycle = LifecycleOnly()
-    without_mobility.bind(lifecycle)
-    try:
-        lifecycle.require_event(PositionUpdate)
-    except ProtocolSetUpException as error:
-        check("PositionUpdate" in error.message, "missing requirement after binding is rejected")
-    else:
-        raise AssertionError("A later missing requirement should be rejected")
+        raise AssertionError("A later missing requirement should fail")
 
 
 if __name__ == "__main__":

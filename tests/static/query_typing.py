@@ -3,7 +3,7 @@
 from typing import assert_type
 
 from gradys_core.primitives import BaseCommand, BaseEvent, BaseQuery
-from gradys_core.protocol import BaseProtocol
+from gradys_core.protocol import ProtocolContext
 from gradys_core.protocol.handles import QueryHandle
 
 
@@ -30,10 +30,6 @@ class OtherQuery(BaseQuery[PositionResponse]):
         return PositionResponse
 
 
-protocol = BaseProtocol()
-position = protocol.require_query(GetPosition)
-assert_type(position, QueryHandle[GetPosition, PositionResponse])
-assert_type(GetPosition.query_types(), tuple[type[GetPosition], type[PositionResponse]])
 
 
 def on_position(response: PositionResponse) -> None:
@@ -44,7 +40,11 @@ def on_other(response: OtherResponse) -> None:
     pass
 
 
-position.request(GetPosition(1), on_position)
-position.request(OtherQuery(), on_position)  # type: ignore[arg-type]
-position.request(GetPosition(1), on_other)  # type: ignore[arg-type]
-protocol.require_query(BaseCommand)  # type: ignore[arg-type]
+def check_query_types(context: ProtocolContext) -> None:
+    position = context.require_query(GetPosition)
+    assert_type(position, QueryHandle[GetPosition, PositionResponse])
+    assert_type(GetPosition.query_types(), tuple[type[GetPosition], type[PositionResponse]])
+    position.request(GetPosition(1), on_position)
+    position.request(OtherQuery(), on_position)  # type: ignore[arg-type]
+    position.request(GetPosition(1), on_other)  # type: ignore[arg-type]
+    context.require_query(BaseCommand)  # type: ignore[arg-type]

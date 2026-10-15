@@ -9,7 +9,7 @@ from gradys_core.primitives import BaseEvent, EventId, environment_event
 class SimulationInitializationEvent(BaseEvent):
     """Notify a protocol that its environment lifecycle has begun.
 
-    The environment decides when to deliver this event; injecting a connection
+    The environment decides when to deliver this event; creating a connection
     does not emit it automatically. The event carries no payload.
     """
 

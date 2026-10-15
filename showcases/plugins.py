@@ -1,51 +1,44 @@
-"""Plugins that receive a protocol and register their own requirements on it.
+"""Plugins sharing the protocol's connected context.
 
 Run from the repository root with ``python -m showcases.plugins``.
-
-A plugin has no connection of its own: every subscription and command goes through the
-protocol it was given. Two cases are shown:
-
-- disjoint: the plugin requires capabilities the protocol never asked for. They become
-  the protocol's requirements, so a missing one rejects the whole protocol at binding.
-- intersection: protocol and plugin require the same event and command. Requirements
-  are deduplicated, both commands execute in send order, and every event reaches both
-  subscribers regardless of whose command caused it.
+Requirements are checked individually, including overlapping requirements.
+Events reach all matching subscribers regardless of who sent a command.
 """
 
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.errors import ProtocolSetUpException
-from gradys_core.protocol import BaseProtocol
+from gradys_core.protocol import BaseProtocol, ProtocolContext
 
 from .checks import check
 from .mock_environment import MockEnvironment
 
 
 class MovementPlugin:
-    """Add mobility requirements and position handling to a supplied protocol.
+    """Add mobility requirements and position handling to a supplied context.
 
     Attributes:
         notifications: Position descriptions received by this plugin.
-        move: Command handle obtained through the owning protocol.
+        move: Command handle obtained through the shared context.
     """
 
     def __init__(
         self,
-        protocol: BaseProtocol,
+        context: ProtocolContext,
         destination: tuple[float, float, float],
         log: list[str] | None = None,
     ) -> None:
-        """Subscribe to positions and queue movement through the owning protocol.
+        """Subscribe to positions and queue movement through the shared context.
 
         Args:
-            protocol: Protocol whose requirements and connection the plugin uses.
+            context: Connected capability access shared with the protocol.
             destination: Cartesian destination for the initial movement command.
             log: Optional shared list recording protocol/plugin delivery order.
         """
         self.notifications: list[str] = []
         self._log = log
-        protocol.require_event(PositionUpdate).subscribe(self.on_position)
-        self.move = protocol.require_command(GotoCoords)
+        context.require_event(PositionUpdate).subscribe(self.on_position)
+        self.move = context.require_command(GotoCoords)
         self.move.send(GotoCoords(*destination))
 
     def on_position(self, event: PositionUpdate) -> None:
@@ -65,10 +58,13 @@ class LifecycleProtocol(BaseProtocol):
     """
 
     def __init__(self) -> None:
-        """Queue initialization handling and construct a plugin on this protocol."""
+        """Initialize local state."""
         self.notifications: list[str] = []
-        self.require_event(SimulationInitializationEvent).subscribe(self.on_start)
-        self.plugin = MovementPlugin(self, (1.0, 2.0, 3.0))
+
+    def run(self, context: ProtocolContext) -> None:
+        """Register lifecycle handling and initialize the plugin."""
+        context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
+        self.plugin = MovementPlugin(context, (1.0, 2.0, 3.0))
 
     def on_start(self, event: SimulationInitializationEvent) -> None:
         """Record the environment's initialization notification."""
@@ -86,14 +82,17 @@ class SharedMovementProtocol(BaseProtocol):
     """
 
     def __init__(self) -> None:
-        """Queue the protocol's subscriptions and movement before the plugin's."""
+        """Initialize local state."""
         self.notifications: list[str] = []
         self.log: list[str] = []  # Shared with the plugin to record delivery order.
-        self.require_event(SimulationInitializationEvent).subscribe(self.on_start)
-        self.require_event(PositionUpdate).subscribe(self.on_position)
-        self.move = self.require_command(GotoCoords)
+
+    def run(self, context: ProtocolContext) -> None:
+        """Register subscriptions and movement through the shared context."""
+        context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
+        context.require_event(PositionUpdate).subscribe(self.on_position)
+        self.move = context.require_command(GotoCoords)
         self.move.send(GotoCoords(1.0, 2.0, 3.0))
-        self.plugin = MovementPlugin(self, (4.0, 5.0, 6.0), self.log)
+        self.plugin = MovementPlugin(context, (4.0, 5.0, 6.0), self.log)
 
     def on_start(self, event: SimulationInitializationEvent) -> None:
         """Record initialization before the environment executes queued movement."""
@@ -107,7 +106,7 @@ class SharedMovementProtocol(BaseProtocol):
 
 
 def disjoint() -> None:
-    """Check that plugin requirements join the protocol's binding requirements."""
+    """Check that plugin requirements are validated through the shared context."""
     print("Disjoint: plugin adds mobility to a lifecycle-only protocol")
     environment = MockEnvironment()
     protocol = LifecycleProtocol()
@@ -125,13 +124,6 @@ def disjoint() -> None:
               "missing plugin capability rejects the protocol")
     else:
         raise AssertionError("Binding should reject the plugin's mobility requirements")
-
-    try:
-        rejected.require_event(SimulationInitializationEvent)
-    except RuntimeError:
-        check(True, "rejected protocol is unusable")
-    else:
-        raise AssertionError("A failed connection should reject the protocol's own requests")
 
 
 def intersection() -> None:

@@ -48,17 +48,12 @@ class EventEnvironment:
 
 
 @pytest.mark.parametrize("immediate", [True, False])
-@pytest.mark.parametrize("before_injection", [True, False])
-def test_once_cleans_up_for_both_delivery_timings(immediate: bool, before_injection: bool) -> None:
-    connection = Connection()
+def test_once_cleans_up_for_both_delivery_timings(immediate: bool) -> None:
     environment = EventEnvironment(immediate)
+    connection = Connection(environment)
     received: list[Notice] = []
 
-    if not before_injection:
-        connection.inject(environment)
     connection.subscribe(Notice, received.append, SubscriptionOptions(once=True))
-    if before_injection:
-        connection.inject(environment)
 
     if immediate:
         assert environment.handlers == []

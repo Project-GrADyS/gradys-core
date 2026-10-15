@@ -10,8 +10,9 @@ from typing import cast
 
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
+from gradys_core.connection import Connection
 from gradys_core.primitives import BaseCommand, BaseEvent
-from gradys_core.protocol import BaseProtocol
+from gradys_core.protocol import BaseProtocol, ProtocolContext
 
 
 class MobilityHandler:
@@ -43,9 +44,8 @@ class MockEnvironment:
     """Queue commands until startup and dispatch exact event types synchronously.
 
     This showcase adapter demonstrates capability checks and execution timing.
-    Its ``event_subscriber`` does not return an unsubscription callback, so it
-    does not satisfy the full ``Environment`` contract and cannot demonstrate
-    cancellation or one-shot cleanup.
+    Core operations are forwarded immediately; this adapter queues accepted
+    commands until start() to demonstrate environment-owned scheduling.
 
     Attributes:
         executed: Commands removed from the queue for execution, in order.
@@ -69,9 +69,11 @@ class MockEnvironment:
         self._draining = False
         self.executed: list[BaseCommand] = []
 
-    def bind(self, protocol: BaseProtocol) -> None:
-        """Validate capabilities and connect a protocol to this environment."""
-        protocol._inject(self)
+    def bind(self, protocol: BaseProtocol) -> ProtocolContext:
+        """Run the protocol with an available context and return that context."""
+        context = ProtocolContext(Connection(self))
+        protocol.run(context)
+        return context
 
     def command_checker(self, command_type: type[BaseCommand]) -> bool:
         """Return whether this exact command class has a registered handler."""
@@ -81,10 +83,12 @@ class MockEnvironment:
         """Return whether this exact event class is advertised by the environment."""
         return event_type in self._event_types
 
-    def event_subscriber[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> None:
-        """Append a handler for exact-type delivery without cancellation support."""
+    def event_subscriber[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> Callable[[], None]:
+        """Register an exact-type handler and return its removal callback."""
         # Event type and handler stay paired; storage erases only the generic type.
-        self._subscribers[event_type].append(cast(Callable[[BaseEvent], None], handler))
+        erased = cast(Callable[[BaseEvent], None], handler)
+        self._subscribers[event_type].append(erased)
+        return lambda: self._subscribers[event_type].remove(erased)
 
     def emit(self, event: BaseEvent) -> None:
         """Deliver to a snapshot of exact-type handlers in registration order.

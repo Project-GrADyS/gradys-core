@@ -7,7 +7,7 @@ from gradys_core.primitives import BaseEvent, EventHandler
 
 
 class Subscription(Protocol):
-    """Control one event-handler registration, including a pending one."""
+    """Control one event-handler registration."""
 
     def unsubscribe(self) -> None:
         """Remove this handler registration."""
@@ -32,7 +32,7 @@ class Subscriber(Protocol):
                                 event: type[E], 
                                 handler: EventHandler[E], 
                                 options: SubscriptionOptions | None = None) -> Subscription:
-        """Register an event handler, buffering registration until connected.
+        """Register an event handler on the connected environment.
 
         Args:
             event: Event class to subscribe to.
@@ -40,6 +40,6 @@ class Subscriber(Protocol):
             options: Delivery options; ``None`` uses an ongoing subscription.
 
         Returns:
-            A token used to cancel the pending or active registration.
+            A token used to cancel the registration.
         """
         ...
