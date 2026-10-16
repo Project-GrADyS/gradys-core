@@ -17,10 +17,13 @@ class Example(BaseProtocol):
         event = context.require_event(PositionUpdate)
         assert_type(command, CommandHandle[GotoCoords])
         assert_type(event, EventHandle[PositionUpdate])
-        command.send(GotoCoords(1.0, 2.0, 3.0))
+        self.command = command
         event.subscribe(self.on_position)
-        command.send(PositionUpdate)  # type: ignore[arg-type]
         event.subscribe(self.wrong_handler)  # type: ignore[arg-type]
+
+    async def move(self) -> None:
+        assert_type(await self.command.send(GotoCoords(1.0, 2.0, 3.0)), None)
+        await self.command.send(PositionUpdate)  # type: ignore[arg-type]
 
     def on_position(self, event: PositionUpdate) -> None:
         pass

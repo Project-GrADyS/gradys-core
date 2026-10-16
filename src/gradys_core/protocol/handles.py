@@ -1,5 +1,6 @@
 """Typed command, event, and query handles used by protocol implementations."""
 
+import asyncio
 from typing import Protocol
 
 from gradys_core.connection import Sender, Subscriber, Subscription
@@ -23,7 +24,7 @@ class CommandHandle[C: BaseCommand]:
         self._command = command_type
         self._sender = sender
 
-    def send(self, command: C) -> None:
+    async def send(self, command: C) -> None:
         """Forward a command to the connected environment.
 
         Execution timing and completion belong to the environment. Exceptions
@@ -34,7 +35,7 @@ class CommandHandle[C: BaseCommand]:
         """
         if not isinstance(command, self._command):
             raise TypeError(f"Command must be of type {self._command.__name__}, got {type(command).__name__}")
-        self._sender.send(command)
+        await self._sender.send(command)
 
 
 class EventHandle[E: BaseEvent]:
@@ -83,7 +84,7 @@ class QueryHandle[C: BaseCommand, R: BaseEvent]:
         self._response = response_type
         self._querier = querier
 
-    def request(self, command: C, on_response: EventHandler[R]) -> Subscription:
+    async def request(self, command: C) -> R:
         """Send a query command and redirect it's response to the on_response callback.
 
         The first matching event consumes this request's subscription, even if
@@ -104,9 +105,11 @@ class QueryHandle[C: BaseCommand, R: BaseEvent]:
         """
         if not isinstance(command, self._query):
             raise TypeError(f"Query must be of type {self._query.__name__}, got {type(command).__name__}")
-        
-        subscription = self._querier.subscribe(self._response,
-                                               on_response, 
-                                               options=SubscriptionOptions(once=True))
-        self._querier.send(command)
-        return subscription
+
+        future = asyncio.get_event_loop().create_future()
+        on_response: EventHandler[R] = lambda event: future.set_result(event)
+        self._querier.subscribe(self._response,
+                                on_response, 
+                                options=SubscriptionOptions(once=True))
+        await self._querier.send(command)
+        return await future

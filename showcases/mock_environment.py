@@ -11,40 +11,57 @@ from typing import cast
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.connection import Connection
-from gradys_core.primitives import BaseCommand, BaseEvent
+from gradys_core.primitives import BaseCommand, BaseEvent, BaseQuery
 from gradys_core.protocol import BaseProtocol, ProtocolContext
+
+
+class GetPosition(BaseQuery[PositionUpdate]):
+    """Ask for the example environment's current position."""
+
+    command_id = "GetPosition"
+
+    @classmethod
+    def response_type(cls) -> type[PositionUpdate]:
+        """Pair this query with a position response event."""
+        return PositionUpdate
 
 
 class MobilityHandler:
     """Accept movement requests and publish position observations."""
 
-    commands = frozenset({GotoCoords})
+    commands = frozenset({GotoCoords, GetPosition})
     """Command classes handled by this example mobility implementation."""
     events = frozenset({PositionUpdate})
     """Event classes this handler can publish."""
 
+    def __init__(self) -> None:
+        """Initialize the current position at the origin."""
+        self._position = PositionUpdate(0.0, 0.0, 0.0)
+
     def handle(self, command: BaseCommand, emit: Callable[[BaseEvent], None]) -> None:
-        """Turn a movement command into an immediate position update.
+        """Report a movement destination or answer a position query.
 
         This example reports the destination without simulating motion.
 
         Args:
-            command: Movement request to execute.
+            command: Movement or position request to execute.
             emit: Callback used to publish the resulting position event.
 
         Raises:
-            TypeError: If the command is not a ``GotoCoords`` instance.
+            TypeError: If the command is not a supported mobility request.
         """
-        if not isinstance(command, GotoCoords):
+        if isinstance(command, GotoCoords):
+            self._position = PositionUpdate(command.x, command.y, command.z)
+        elif not isinstance(command, GetPosition):
             raise TypeError(f"Unsupported mobility command: {type(command).__name__}")
-        emit(PositionUpdate(command.x, command.y, command.z))
+        emit(self._position)
 
 
 class MockEnvironment:
     """Queue commands until startup and dispatch exact event types synchronously.
 
     This showcase adapter demonstrates capability checks and execution timing.
-    Core operations are forwarded immediately; this adapter queues accepted
+    Awaited sends are accepted immediately; this adapter queues accepted
     commands until start() to demonstrate environment-owned scheduling.
 
     Attributes:
@@ -75,15 +92,15 @@ class MockEnvironment:
         protocol.run(context)
         return context
 
-    def command_checker(self, command_type: type[BaseCommand]) -> bool:
+    def check_command(self, command_type: type[BaseCommand]) -> bool:
         """Return whether this exact command class has a registered handler."""
         return command_type in self._command_handlers
 
-    def event_checker(self, event_type: type[BaseEvent]) -> bool:
+    def check_event(self, event_type: type[BaseEvent]) -> bool:
         """Return whether this exact event class is advertised by the environment."""
         return event_type in self._event_types
 
-    def event_subscriber[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> Callable[[], None]:
+    def subscribe_to_event[E: BaseEvent](self, event_type: type[E], handler: Callable[[E], None]) -> Callable[[], None]:
         """Register an exact-type handler and return its removal callback."""
         # Event type and handler stay paired; storage erases only the generic type.
         erased = cast(Callable[[BaseEvent], None], handler)
@@ -99,7 +116,7 @@ class MockEnvironment:
         for handler in tuple(self._subscribers[type(event)]):
             handler(event)
 
-    def command_sender(self, command: BaseCommand) -> None:
+    async def send_command(self, command: BaseCommand) -> None:
         """Accept a command; execution waits until the environment starts."""
         self._pending_commands.append(command)
         if self._running:
@@ -108,7 +125,7 @@ class MockEnvironment:
     def start(self) -> None:
         """Emit initialization, mark the runtime running, and drain queued commands.
 
-        Commands sent by initialization handlers join the queue before draining.
+        Initialization handlers run before queued commands are drained.
 
         Raises:
             RuntimeError: If the environment is already running.
@@ -122,8 +139,8 @@ class MockEnvironment:
     def _drain(self) -> None:
         """Execute queued commands in order, including commands added by callbacks.
 
-        The guard lets the outer loop handle reentrant sends without recursive
-        draining. Reset it even when execution or event delivery raises.
+        The guard prevents nested drains during event delivery. Reset it even
+        when execution or event delivery raises.
         """
         if self._draining:
             return

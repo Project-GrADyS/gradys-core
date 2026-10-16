@@ -43,9 +43,9 @@ class Connection(Sender, Subscriber):
         """Validate a newly requested event capability immediately."""
         validate_event_type(self._environment, event_type)
 
-    def send(self, command: BaseCommand) -> None:
+    async def send(self, command: BaseCommand) -> None:
         """Let the environment accept a command without further type validation."""
-        self._environment.command_sender(command)
+        await self._environment.send_command(command)
 
     def subscribe[E: BaseEvent](self, event: type[E], handler: EventHandler[E], options: SubscriptionOptions | None = None) -> Subscription:
         """Register immediately, guarding one-shot handlers against repeated delivery.
@@ -74,7 +74,7 @@ class Connection(Sender, Subscriber):
                 original_handler(event)
             handler = once_callback
         
-        unsubscription_callback = self._environment.event_subscriber(event, handler)
+        unsubscription_callback = self._environment.subscribe_to_event(event, handler)
 
         # If registration delivered an event, cleanup had to wait for its return value.
         if options.once and has_been_called:

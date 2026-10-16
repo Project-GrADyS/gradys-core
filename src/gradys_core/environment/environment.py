@@ -13,15 +13,15 @@ class Environment(Protocol):
     environment controls when accepted commands execute and events are delivered.
     """
 
-    def command_sender(self, command: BaseCommand, /) -> None:
+    async def send_command(self, command: BaseCommand, /) -> None:
         """Accept a command for execution."""
         ...
 
-    def command_checker(self, command_type: type[BaseCommand], /) -> bool:
+    def check_command(self, command_type: type[BaseCommand], /) -> bool:
         """Report support for a command type without executing a command."""
         ...
 
-    def event_subscriber[E: BaseEvent](
+    def subscribe_to_event[E: BaseEvent](
         self, event_type: type[E], handler: EventHandler[E], /
     ) -> Callable[[], None]:
         """Register an event handler and return its unsubscription callback.
@@ -35,6 +35,6 @@ class Environment(Protocol):
         """
         ...
 
-    def event_checker(self, event_type: type[BaseEvent], /) -> bool:
+    def check_event(self, event_type: type[BaseEvent], /) -> bool:
         """Report support for an event type without registering a handler."""
         ...

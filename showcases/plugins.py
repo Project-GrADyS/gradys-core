@@ -5,6 +5,8 @@ Requirements are checked individually, including overlapping requirements.
 Events reach all matching subscribers regardless of who sent a command.
 """
 
+import asyncio
+
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
 from gradys_core.errors import ProtocolSetUpException
@@ -28,7 +30,7 @@ class MovementPlugin:
         destination: tuple[float, float, float],
         log: list[str] | None = None,
     ) -> None:
-        """Subscribe to positions and queue movement through the shared context.
+        """Subscribe to positions and retain a handle on the shared context.
 
         Args:
             context: Connected capability access shared with the protocol.
@@ -36,10 +38,14 @@ class MovementPlugin:
             log: Optional shared list recording protocol/plugin delivery order.
         """
         self.notifications: list[str] = []
+        self.destination = destination
         self._log = log
         context.require_event(PositionUpdate).subscribe(self.on_position)
         self.move = context.require_command(GotoCoords)
-        self.move.send(GotoCoords(*destination))
+
+    async def move_to_destination(self) -> None:
+        """Await acceptance of this plugin's initial movement command."""
+        await self.move.send(GotoCoords(*self.destination))
 
     def on_position(self, event: PositionUpdate) -> None:
         """Record an observation and append it to the shared log when supplied."""
@@ -91,7 +97,6 @@ class SharedMovementProtocol(BaseProtocol):
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         context.require_event(PositionUpdate).subscribe(self.on_position)
         self.move = context.require_command(GotoCoords)
-        self.move.send(GotoCoords(1.0, 2.0, 3.0))
         self.plugin = MovementPlugin(context, (4.0, 5.0, 6.0), self.log)
 
     def on_start(self, event: SimulationInitializationEvent) -> None:
@@ -105,12 +110,13 @@ class SharedMovementProtocol(BaseProtocol):
         self.log.append(f"protocol {notification}")
 
 
-def disjoint() -> None:
+async def disjoint() -> None:
     """Check that plugin requirements are validated through the shared context."""
     print("Disjoint: plugin adds mobility to a lifecycle-only protocol")
     environment = MockEnvironment()
     protocol = LifecycleProtocol()
     environment.bind(protocol)
+    await protocol.plugin.move_to_destination()
     environment.start()
     check(protocol.notifications == ["started"], "protocol gets only its own events")
     check(protocol.plugin.notifications == ["position: (1.0, 2.0, 3.0)"], "plugin gets its events")
@@ -126,12 +132,14 @@ def disjoint() -> None:
         raise AssertionError("Binding should reject the plugin's mobility requirements")
 
 
-def intersection() -> None:
+async def intersection() -> None:
     """Check shared capabilities, command order, and delivery to both subscribers."""
     print("\nIntersection: protocol and plugin share PositionUpdate and GotoCoords")
     environment = MockEnvironment()
     protocol = SharedMovementProtocol()
     environment.bind(protocol)
+    await protocol.move.send(GotoCoords(1.0, 2.0, 3.0))
+    await protocol.plugin.move_to_destination()
     environment.start()
     check(environment.executed == [GotoCoords(1.0, 2.0, 3.0), GotoCoords(4.0, 5.0, 6.0)],
           "both commands execute in send order")
@@ -146,8 +154,8 @@ def intersection() -> None:
         "plugin position: (4.0, 5.0, 6.0)",
     ], "handlers run in subscription order")
 
-    protocol.move.send(GotoCoords(7.0, 8.0, 9.0))
-    protocol.plugin.move.send(GotoCoords(0.0, 0.0, 0.0))
+    await protocol.move.send(GotoCoords(7.0, 8.0, 9.0))
+    await protocol.plugin.move.send(GotoCoords(0.0, 0.0, 0.0))
     check(protocol.log[-4:] == [
         "protocol position: (7.0, 8.0, 9.0)",
         "plugin position: (7.0, 8.0, 9.0)",
@@ -156,11 +164,11 @@ def intersection() -> None:
     ], "both handles still work after binding")
 
 
-def main() -> None:
+async def main() -> None:
     """Run the disjoint and overlapping plugin requirement demonstrations."""
-    disjoint()
-    intersection()
+    await disjoint()
+    await intersection()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

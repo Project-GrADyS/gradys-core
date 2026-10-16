@@ -1,7 +1,9 @@
-"""Synchronous execution through a context, events, and later requirements.
+"""Synchronous setup with awaited commands, events, and later requirements.
 
 Run from the repository root with ``python -m showcases.success``.
 """
+
+import asyncio
 
 from gradys_core.capabilities.lifecycle import SimulationInitializationEvent
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
@@ -12,7 +14,7 @@ from .mock_environment import MockEnvironment
 
 
 class MoveProtocol(BaseProtocol):
-    """Request movement during run and record lifecycle/position events.
+    """Set up movement during run and record lifecycle/position events.
 
     Attributes:
         notifications: Event descriptions in delivery order.
@@ -25,11 +27,14 @@ class MoveProtocol(BaseProtocol):
         self.notifications: list[str] = []
 
     def run(self, context: ProtocolContext) -> None:
-        """Subscribe to events and send movement through the connected context."""
+        """Subscribe to events and retain a movement handle."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         context.require_event(PositionUpdate).subscribe(self.on_position)
         self.move = context.require_command(GotoCoords)
-        self.move.send(GotoCoords(*self.destination))
+
+    async def move_to_destination(self) -> None:
+        """Await acceptance of the configured movement command."""
+        await self.move.send(GotoCoords(*self.destination))
 
     def on_start(self, event: SimulationInitializationEvent) -> None:
         """Record the environment's initialization notification."""
@@ -40,23 +45,24 @@ class MoveProtocol(BaseProtocol):
         self.notifications.append(f"position: ({event.x}, {event.y}, {event.z})")
 
 
-def main() -> None:
+async def main() -> None:
     """Check run-time operations and handles used after run returns."""
     print("Run: context requirements, events and commands")
     environment = MockEnvironment()
     protocol = MoveProtocol((1.0, 2.0, 3.0))
 
     context = environment.bind(protocol)
+    await protocol.move_to_destination()
     check(environment.executed == [], "commands wait until start")
     environment.start()
     check(protocol.notifications == ["started", "position: (1.0, 2.0, 3.0)"],
           "start delivers lifecycle and position events")
 
     later_move = context.require_command(GotoCoords)
-    later_move.send(GotoCoords(4.0, 5.0, 6.0))
+    await later_move.send(GotoCoords(4.0, 5.0, 6.0))
     check(protocol.notifications[-1] == "position: (4.0, 5.0, 6.0)", "requirement after binding works")
     check(len(environment.executed) == 2, "every command executes")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

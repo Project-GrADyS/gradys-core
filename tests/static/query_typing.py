@@ -11,10 +11,6 @@ class PositionResponse(BaseEvent):
     pass
 
 
-class OtherResponse(BaseEvent):
-    pass
-
-
 class GetPosition(BaseQuery[PositionResponse]):
     def __init__(self, node_id: int) -> None:
         self.node_id = node_id
@@ -30,21 +26,10 @@ class OtherQuery(BaseQuery[PositionResponse]):
         return PositionResponse
 
 
-
-
-def on_position(response: PositionResponse) -> None:
-    pass
-
-
-def on_other(response: OtherResponse) -> None:
-    pass
-
-
-def check_query_types(context: ProtocolContext) -> None:
+async def check_query_types(context: ProtocolContext) -> None:
     position = context.require_query(GetPosition)
     assert_type(position, QueryHandle[GetPosition, PositionResponse])
     assert_type(GetPosition.query_types(), tuple[type[GetPosition], type[PositionResponse]])
-    position.request(GetPosition(1), on_position)
-    position.request(OtherQuery(), on_position)  # type: ignore[arg-type]
-    position.request(GetPosition(1), on_other)  # type: ignore[arg-type]
+    assert_type(await position.request(GetPosition(1)), PositionResponse)
+    await position.request(OtherQuery())  # type: ignore[arg-type]
     context.require_query(BaseCommand)  # type: ignore[arg-type]

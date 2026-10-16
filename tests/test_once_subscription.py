@@ -18,16 +18,16 @@ class EventEnvironment:
         self.handlers: list[EventHandler[BaseEvent]] = []
         self.removals = 0
 
-    def command_sender(self, command: BaseCommand) -> None:
+    async def send_command(self, command: BaseCommand) -> None:
         pass
 
-    def command_checker(self, command_type: type[BaseCommand]) -> bool:
+    def check_command(self, command_type: type[BaseCommand]) -> bool:
         return True
 
-    def event_checker(self, event_type: type[BaseEvent]) -> bool:
+    def check_event(self, event_type: type[BaseEvent]) -> bool:
         return True
 
-    def event_subscriber[E: BaseEvent](
+    def subscribe_to_event[E: BaseEvent](
         self, event_type: type[E], handler: EventHandler[E]
     ) -> Callable[[], None]:
         erased = cast(EventHandler[BaseEvent], handler)

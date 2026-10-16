@@ -8,7 +8,7 @@ from gradys_core.primitives import BaseCommand
 class Sender(Protocol):
     """Command sending capabilities provided by a connection to an environment."""
 
-    def send(self, command: BaseCommand) -> None:
+    async def send(self, command: BaseCommand) -> None:
         """Accept a command for forwarding to an execution environment.
 
         Acceptance does not guarantee that the command has executed.

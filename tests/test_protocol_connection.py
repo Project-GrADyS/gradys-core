@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from typing import cast
 
@@ -36,15 +37,15 @@ class RecordingEnvironment:
         self.unsupported_command: type[BaseCommand] | None = None
         self.unsupported_event: type[BaseEvent] | None = None
 
-    def command_sender(self, command: BaseCommand) -> None:
+    async def send_command(self, command: BaseCommand) -> None:
         self.seen.append(("command", command.command_id))
         if isinstance(command, GetNotice):
             self.emit(Notice())
 
-    def command_checker(self, command_type: type[BaseCommand]) -> bool:
+    def check_command(self, command_type: type[BaseCommand]) -> bool:
         return command_type is not self.unsupported_command
 
-    def event_subscriber[E: BaseEvent](
+    def subscribe_to_event[E: BaseEvent](
         self, event_type: type[E], handler: EventHandler[E]
     ) -> Callable[[], None]:
         self.seen.append(("subscription", event_type))
@@ -52,7 +53,7 @@ class RecordingEnvironment:
         self.handlers.append(erased)
         return lambda: self.handlers.remove(erased)
 
-    def event_checker(self, event_type: type[BaseEvent]) -> bool:
+    def check_event(self, event_type: type[BaseEvent]) -> bool:
         return event_type is not self.unsupported_event
 
     def emit(self, event: BaseEvent) -> None:
@@ -68,7 +69,7 @@ def test_protocol_requires_run_implementation() -> None:
         MissingRun()  # type: ignore[abstract]
 
 
-def test_run_forwards_operations_in_call_order_and_retains_handles() -> None:
+def test_operations_follow_await_order_and_handles_survive_run() -> None:
     environment = RecordingEnvironment()
     context = ProtocolContext(Connection(environment))
 
@@ -78,21 +79,28 @@ def test_run_forwards_operations_in_call_order_and_retains_handles() -> None:
 
         def run(self, context: ProtocolContext) -> None:
             self.first = context.require_command(FirstCommand)
-            self.first.send(FirstCommand())
-            context.require_event(Notice).subscribe(self.received.append)
-            context.require_command(SecondCommand).send(SecondCommand())
+            self.notice = context.require_event(Notice)
+            self.second = context.require_command(SecondCommand)
 
     protocol = Example()
     assert environment.seen == []
     protocol.run(context)
-    assert environment.seen == [
-        ("command", "first"), ("subscription", Notice), ("command", "second")
-    ]
-    protocol.first.send(FirstCommand())
-    notice = Notice()
-    environment.emit(notice)
-    assert protocol.received == [notice]
-    assert environment.seen[-1] == ("command", "first")
+    assert environment.seen == []
+
+    async def exercise_handles() -> None:
+        await protocol.first.send(FirstCommand())
+        protocol.notice.subscribe(protocol.received.append)
+        await protocol.second.send(SecondCommand())
+        assert environment.seen == [
+            ("command", "first"), ("subscription", Notice), ("command", "second")
+        ]
+        await protocol.first.send(FirstCommand())
+        notice = Notice()
+        environment.emit(notice)
+        assert protocol.received == [notice]
+        assert environment.seen[-1] == ("command", "first")
+
+    asyncio.run(exercise_handles())
 
 
 def test_requirements_do_not_send_or_subscribe_and_recheck_support() -> None:
@@ -130,14 +138,13 @@ def test_failed_requirement_propagates_without_rolling_back_previous_action() ->
     environment.unsupported_event = Notice
     context = ProtocolContext(Connection(environment))
 
-    class Example(BaseProtocol):
-        def run(self, context: ProtocolContext) -> None:
-            context.require_command(FirstCommand).send(FirstCommand())
-            context.require_event(Notice)
-            context.require_command(SecondCommand).send(SecondCommand())
+    async def perform_operations() -> None:
+        await context.require_command(FirstCommand).send(FirstCommand())
+        context.require_event(Notice)
+        await context.require_command(SecondCommand).send(SecondCommand())
 
     with pytest.raises(ProtocolSetUpException, match="Notice"):
-        Example().run(context)
+        asyncio.run(perform_operations())
     assert environment.seen == [("command", "first")]
 
 
@@ -145,14 +152,14 @@ def test_subscription_created_during_send_is_installed_immediately() -> None:
     received: list[Notice] = []
 
     class ReentrantEnvironment(RecordingEnvironment):
-        def command_sender(self, command: BaseCommand) -> None:
-            super().command_sender(command)
+        async def send_command(self, command: BaseCommand) -> None:
+            await super().send_command(command)
             context.require_event(Notice).subscribe(received.append)
             self.emit(Notice())
 
     environment = ReentrantEnvironment()
     context = ProtocolContext(Connection(environment))
-    context.require_command(FirstCommand).send(FirstCommand())
+    asyncio.run(context.require_command(FirstCommand).send(FirstCommand()))
     assert len(received) == 1
     assert environment.seen == [("command", "first"), ("subscription", Notice)]
 
@@ -166,11 +173,12 @@ def test_plugin_shares_context_and_subscription_can_be_cancelled() -> None:
     class Example(BaseProtocol):
         def run(self, context: ProtocolContext) -> None:
             self.plugin = Plugin(context)
-            context.require_command(GetNotice).send(GetNotice())
+            self.get_notice = context.require_command(GetNotice)
 
     environment = RecordingEnvironment()
     protocol = Example()
     protocol.run(ProtocolContext(Connection(environment)))
+    asyncio.run(protocol.get_notice.send(GetNotice()))
     assert len(protocol.plugin.received) == 1
     protocol.plugin.subscription.unsubscribe()
     environment.emit(Notice())
@@ -178,22 +186,73 @@ def test_plugin_shares_context_and_subscription_can_be_cancelled() -> None:
     assert environment.handlers == []
 
 
-def test_query_callback_remains_synchronous_and_one_shot() -> None:
+def test_query_returns_immediate_response_and_unsubscribes() -> None:
     environment = RecordingEnvironment()
     context = ProtocolContext(Connection(environment))
-    received: list[Notice] = []
-    context.require_query(GetNotice).request(GetNotice(), received.append)
-    assert len(received) == 1
+    response = asyncio.run(context.require_query(GetNotice).request(GetNotice()))
+    assert isinstance(response, Notice)
+    assert environment.seen == [("subscription", Notice), ("command", "get_notice")]
     assert environment.handlers == []
     environment.emit(Notice())
-    assert len(received) == 1
+    assert environment.handlers == []
 
 
-def test_environment_send_errors_propagate() -> None:
+def test_query_waits_for_delayed_response_and_consumes_only_first_event() -> None:
+    async def request_and_respond() -> None:
+        sent = asyncio.Event()
+
+        class DelayedEnvironment(RecordingEnvironment):
+            async def send_command(self, command: BaseCommand) -> None:
+                self.seen.append(("command", command.command_id))
+                sent.set()
+
+        environment = DelayedEnvironment()
+        context = ProtocolContext(Connection(environment))
+        request = asyncio.create_task(context.require_query(GetNotice).request(GetNotice()))
+        await sent.wait()
+        assert not request.done()
+        assert environment.seen == [("subscription", Notice), ("command", "get_notice")]
+        response = Notice()
+        environment.emit(response)
+        environment.emit(Notice())
+        assert await request is response
+        assert environment.handlers == []
+
+    asyncio.run(asyncio.wait_for(request_and_respond(), timeout=1.0))
+
+
+def test_send_waits_for_environment_acceptance() -> None:
+    async def send_and_accept() -> None:
+        entered, accepted = asyncio.Event(), asyncio.Event()
+
+        class DelayedEnvironment(RecordingEnvironment):
+            async def send_command(self, command: BaseCommand) -> None:
+                entered.set()
+                await accepted.wait()
+                await super().send_command(command)
+
+        environment = DelayedEnvironment()
+        context = ProtocolContext(Connection(environment))
+        sending = asyncio.create_task(context.require_command(FirstCommand).send(FirstCommand()))
+        await entered.wait()
+        assert not sending.done()
+        assert environment.seen == []
+        accepted.set()
+        await sending
+        assert environment.seen == [("command", "first")]
+
+    asyncio.run(asyncio.wait_for(send_and_accept(), timeout=1.0))
+
+
+@pytest.mark.parametrize("query", [False, True])
+def test_environment_send_errors_propagate(query: bool) -> None:
     class FailingEnvironment(RecordingEnvironment):
-        def command_sender(self, command: BaseCommand) -> None:
+        async def send_command(self, command: BaseCommand) -> None:
             raise ValueError("send failed")
 
     context = ProtocolContext(Connection(FailingEnvironment()))
     with pytest.raises(ValueError, match="send failed"):
-        context.require_command(FirstCommand).send(FirstCommand())
+        if query:
+            asyncio.run(context.require_query(GetNotice).request(GetNotice()))
+        else:
+            asyncio.run(context.require_command(FirstCommand).send(FirstCommand()))

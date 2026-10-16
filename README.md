@@ -1,8 +1,9 @@
 # gradys-core
 
 An extensible, typed protocol interface for simulation and embedded execution
-environments. Protocols use commands, events, and callback-based queries through
-an environment-provided `ProtocolContext`. All operations are synchronous.
+environments. Protocols use commands, events, and awaited queries through
+an environment-provided `ProtocolContext`. Protocol setup, capability checks,
+and event subscriptions are synchronous; command sends and query requests are async.
 
 ## Implement a protocol
 
@@ -23,20 +24,25 @@ class MoveProtocol(BaseProtocol):
     def run(self, context: ProtocolContext) -> None:
         context.require_event(PositionUpdate).subscribe(self.positions.append)
         self.move = context.require_command(GotoCoords)
-        self.move.send(GotoCoords(*self.destination))
+
+    async def move_to_destination(self) -> None:
+        await self.move.send(GotoCoords(*self.destination))
 ```
 
-Handles retain their connection and remain usable from callbacks after `run`
-returns. Plugins receive the same context and request their own capabilities.
+Handles retain their connection and remain usable after `run` returns.
+Async methods await sends and queries; event callbacks remain synchronous.
+Plugins receive the same context and request their own capabilities.
 No call to a base constructor is required.
 
 ## Connect an environment
 
-An adapter implements the structural `Environment` interface: `command_sender`,
-`command_checker`, `event_subscriber`, and `event_checker`. Event registration
-returns a callable that removes that registration.
+An adapter implements the structural `Environment` interface: async `send_command`,
+and synchronous `check_command`, `subscribe_to_event`, and `check_event`.
+Event registration returns a callable that removes that registration.
 
 ```python
+import asyncio
+
 from gradys_core.connection import Connection
 from gradys_core.protocol import ProtocolContext
 
@@ -44,10 +50,11 @@ from gradys_core.protocol import ProtocolContext
 protocol = MoveProtocol((1.0, 2.0, 3.0))
 context = ProtocolContext(Connection(environment))
 protocol.run(context)
+asyncio.run(protocol.move_to_destination())
 ```
 
 `Connection(environment)` is ready immediately. There is no injection step or
-buffer/replay phase. Operations are forwarded in call order. The environment
+buffer/replay phase. Awaited sends are forwarded in await order. The environment
 chooses when to invoke `run`, execute accepted commands, and deliver lifecycle
 and other events. Core does not enforce single invocation or roll back effects.
 
@@ -58,18 +65,20 @@ and checked each time. Obtaining a handle alone neither sends nor subscribes.
 ## Commands, events, and queries
 
 - `context.require_command(CommandType)` returns a `CommandHandle[CommandType]`.
-  `send(command)` forwards a command; returning does not imply execution completed.
+  `await handle.send(command)` forwards a command; returning does not imply
+  execution completed.
 - `context.require_event(EventType)` returns an `EventHandle[EventType]`.
   `subscribe(callback)` returns a cancellation token. Use
   `options=SubscriptionOptions(once=True)` for at most one delivery.
 - `context.require_query(QueryType)` checks both command and response support and
   returns a `QueryHandle[CommandType, ResponseType]`.
-  `request(command, on_response)` subscribes before sending and returns a token.
+  `await handle.request(command)` subscribes before sending and returns the
+  response event.
 
 Define a query by extending `BaseQuery[ResponseType]` and implementing the
 `response_type()` class method, or provide the structural `QueryDefinition`
-contract. Queries remain callback-based: a response may arrive before `request`
-returns. They consume the next matching response event, without request IDs or
+contract. Queries accept responses delivered during the send or later and await
+the first matching event. They consume that event, without request IDs or
 timeouts; simultaneous requests may receive the same event.
 
 ## Migrating from constructor-time operations

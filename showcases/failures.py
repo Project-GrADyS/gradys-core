@@ -16,8 +16,8 @@ class NeedsMovement(BaseProtocol):
     """Request mobility from the supplied context."""
 
     def run(self, context: ProtocolContext) -> None:
-        """Check movement support before sending a command."""
-        context.require_command(GotoCoords).send(GotoCoords(1.0, 2.0, 3.0))
+        """Check movement support before any asynchronous send is attempted."""
+        self.move = context.require_command(GotoCoords)
 
 
 class NeedsPosition(BaseProtocol):

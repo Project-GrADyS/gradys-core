@@ -15,7 +15,7 @@ def validate_command_type(environment: Environment, command_type: type[BaseComma
     Raises:
         ProtocolSetUpException: If the environment rejects the command type.
     """
-    if not environment.command_checker(command_type):
+    if not environment.check_command(command_type):
         raise ProtocolSetUpException(f"Environment does not support sending commands of type "
                                      f"{command_type.__name__}.")
 
@@ -29,6 +29,6 @@ def validate_event_type(environment: Environment, event_type: type[BaseEvent]) -
     Raises:
         ProtocolSetUpException: If the environment rejects the event type.
     """
-    if not environment.event_checker(event_type):
+    if not environment.check_event(event_type):
         raise ProtocolSetUpException(f"Environment does not support subscribing to events of type "
                                      f"{event_type.__name__}.")
