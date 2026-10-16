@@ -17,7 +17,7 @@ from .mock_environment import MockEnvironment
 class NeedsMovement(BaseProtocol):
     """Request mobility from the supplied context."""
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Check movement support before any asynchronous send is attempted."""
         self.move = context.require_command(GotoCoords)
 
@@ -25,7 +25,7 @@ class NeedsMovement(BaseProtocol):
 class NeedsPosition(BaseProtocol):
     """Request position observations from the supplied context."""
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Check event support before registering a handler."""
         context.require_event(PositionUpdate).subscribe(lambda event: None)
 
@@ -33,13 +33,13 @@ class NeedsPosition(BaseProtocol):
 class LifecycleOnly(BaseProtocol):
     """Use lifecycle support without requiring mobility."""
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Register an initialization handler."""
         context.require_event(SimulationInitializationEvent).subscribe(lambda event: None)
 
 
 async def main() -> None:
-    """Check immediate rejection during run and subsequent context use."""
+    """Check immediate rejection during start and subsequent context use."""
     environment = MockEnvironment(mobility=False)
     for protocol, capability in [(NeedsMovement(), "GotoCoords"), (NeedsPosition(), "PositionUpdate")]:
         try:

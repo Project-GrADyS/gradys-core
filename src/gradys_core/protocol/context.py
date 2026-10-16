@@ -9,7 +9,7 @@ from .handles import CommandHandle, EventHandle, QueryHandle
 class ProtocolContext:
     """Validate requirements and create typed handles on an available connection.
 
-    Environment adapters construct the context before calling a protocol's run
+    Environment adapters construct the context before calling a protocol's start
     method. Plugins may share that context. Unsupported requirements raise
     ProtocolSetUpException immediately; earlier operations are not rolled back.
     """

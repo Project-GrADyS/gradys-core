@@ -7,9 +7,9 @@ and query requests are async; capability checks and event subscriptions are sync
 
 ## Implement a protocol
 
-`BaseProtocol.run(context)` is abstract: every concrete protocol must implement it.
+`BaseProtocol.start(context)` is abstract: every concrete protocol must implement it.
 Constructors initialize configuration and local state. Obtain environment handles
-inside `run`, where the connection is already available:
+inside `start`, where the connection is already available:
 
 ```python
 from gradys_core.capabilities.mobility import GotoCoords, PositionUpdate
@@ -21,7 +21,7 @@ class MoveProtocol(BaseProtocol):
         self.destination = destination
         self.positions: list[PositionUpdate] = []
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         context.require_event(PositionUpdate).subscribe(self.positions.append)
         self.move = context.require_command(GotoCoords)
 
@@ -29,7 +29,7 @@ class MoveProtocol(BaseProtocol):
         await self.move.send(GotoCoords(*self.destination))
 ```
 
-Handles retain their connection and remain usable after `run` returns.
+Handles retain their connection and remain usable after `start` returns.
 Async methods await sends and queries; event callbacks remain synchronous.
 Plugins receive the same context and request their own capabilities.
 No call to a base constructor is required.
@@ -52,7 +52,7 @@ context = ProtocolContext(Connection(environment))
 
 
 async def main() -> None:
-    await protocol.run(context)
+    await protocol.start(context)
     await protocol.move_to_destination()
 
 
@@ -61,7 +61,7 @@ asyncio.run(main())
 
 `Connection(environment)` is ready immediately. There is no injection step or
 buffer/replay phase. Awaited sends are forwarded in await order. The environment
-chooses when to await `run`, execute accepted commands, and deliver lifecycle
+chooses when to await `start`, execute accepted commands, and deliver lifecycle
 and other events. Core does not enforce single invocation or roll back effects.
 
 Each `require_*` validates support immediately and raises `ProtocolSetUpException`
@@ -90,7 +90,7 @@ timeouts; simultaneous requests may receive the same event.
 ## Migrating from constructor-time operations
 
 Move `self.require_*` calls and environment operations from `__init__` to
-`async def run(self, context: ProtocolContext)`, using `context.require_*`. Pass the context
+`async def start(self, context: ProtocolContext)`, using `context.require_*`. Pass the context
 to plugins instead of the protocol. Replace `_inject(environment)` with the
 explicit construction and invocation above. Register callbacks before sending
 commands whose immediate events they need to receive.

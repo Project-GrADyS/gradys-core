@@ -89,7 +89,7 @@ class MockEnvironment:
     async def bind(self, protocol: BaseProtocol) -> ProtocolContext:
         """Run the protocol with an available context and return that context."""
         context = ProtocolContext(Connection(self))
-        await protocol.run(context)
+        await protocol.start(context)
         return context
 
     def check_command(self, command_type: type[BaseCommand]) -> bool:

@@ -12,7 +12,7 @@ from gradys_core.protocol import (
 
 
 class Example(BaseProtocol):
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         command = context.require_command(GotoCoords)
         event = context.require_event(PositionUpdate)
         assert_type(command, CommandHandle[GotoCoords])
@@ -33,5 +33,5 @@ class Example(BaseProtocol):
 
 
 class SyncExample(BaseProtocol):
-    def run(self, context: ProtocolContext) -> None:  # type: ignore[override]
+    def start(self, context: ProtocolContext) -> None:  # type: ignore[override]
         pass

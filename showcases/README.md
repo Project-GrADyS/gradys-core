@@ -10,8 +10,8 @@ python -m showcases.queries
 ```
 
 `success.py` initializes local state in the constructor and obtains handles in
-async `run(context)`, which awaits the initial movement command's acceptance.
-Handles remain usable after run returns. Its async `move_to_destination()`
+async `start(context)`, which awaits the initial movement command's acceptance.
+Handles remain usable after start returns. Its async `move_to_destination()`
 method awaits command acceptance, and each entry point uses `asyncio.run(main())`
 to drive the event loop.
 `failures.py` shows immediate capability validation and error propagation.
@@ -20,7 +20,7 @@ to drive the event loop.
 The environment starts before queries are awaited so queued requests can execute.
 
 `await MockEnvironment.bind(protocol)` constructs `ProtocolContext(Connection(self))`
-and awaits `protocol.run(context)`. Requirements and event subscriptions are synchronous;
+and awaits `protocol.start(context)`. Requirements and event subscriptions are synchronous;
 command sends and query requests must be awaited. This example
 adapter queues accepted commands until `start()` and emits lifecycle events.
 Subscriptions return cancellation callbacks. Environment scheduling is independent

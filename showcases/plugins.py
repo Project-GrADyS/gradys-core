@@ -67,7 +67,7 @@ class LifecycleProtocol(BaseProtocol):
         """Initialize local state."""
         self.notifications: list[str] = []
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Register lifecycle handling and initialize the plugin."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         self.plugin = MovementPlugin(context, (1.0, 2.0, 3.0))
@@ -92,7 +92,7 @@ class SharedMovementProtocol(BaseProtocol):
         self.notifications: list[str] = []
         self.log: list[str] = []  # Shared with the plugin to record delivery order.
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Register subscriptions and movement through the shared context."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         context.require_event(PositionUpdate).subscribe(self.on_position)

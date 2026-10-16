@@ -15,7 +15,7 @@ from .mock_environment import GetPosition, MockEnvironment
 class PositionProtocol(BaseProtocol):
     """Retain movement and query handles for asynchronous use after setup."""
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Validate both query capabilities and retain the typed handles."""
         self.position = context.require_query(GetPosition)
         self.move = context.require_command(GotoCoords)

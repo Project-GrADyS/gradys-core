@@ -14,7 +14,7 @@ from .mock_environment import MockEnvironment
 
 
 class MoveProtocol(BaseProtocol):
-    """Set up movement during run and record lifecycle/position events.
+    """Set up movement during start and record lifecycle/position events.
 
     Attributes:
         notifications: Event descriptions in delivery order.
@@ -26,7 +26,7 @@ class MoveProtocol(BaseProtocol):
         self.destination = destination
         self.notifications: list[str] = []
 
-    async def run(self, context: ProtocolContext) -> None:
+    async def start(self, context: ProtocolContext) -> None:
         """Subscribe to events, retain a handle, and await the initial command."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         context.require_event(PositionUpdate).subscribe(self.on_position)
@@ -47,7 +47,7 @@ class MoveProtocol(BaseProtocol):
 
 
 async def main() -> None:
-    """Check run-time operations and handles used after run returns."""
+    """Check startup operations and handles used after start returns."""
     print("Run: context requirements, events and commands")
     environment = MockEnvironment()
     protocol = MoveProtocol((1.0, 2.0, 3.0))
