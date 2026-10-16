@@ -1,4 +1,4 @@
-"""Synchronous setup with awaited commands, events, and later requirements.
+"""Async execution with awaited commands, events, and later requirements.
 
 Run from the repository root with ``python -m showcases.success``.
 """
@@ -26,11 +26,12 @@ class MoveProtocol(BaseProtocol):
         self.destination = destination
         self.notifications: list[str] = []
 
-    def run(self, context: ProtocolContext) -> None:
-        """Subscribe to events and retain a movement handle."""
+    async def run(self, context: ProtocolContext) -> None:
+        """Subscribe to events, retain a handle, and await the initial command."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         context.require_event(PositionUpdate).subscribe(self.on_position)
         self.move = context.require_command(GotoCoords)
+        await self.move_to_destination()
 
     async def move_to_destination(self) -> None:
         """Await acceptance of the configured movement command."""
@@ -51,8 +52,7 @@ async def main() -> None:
     environment = MockEnvironment()
     protocol = MoveProtocol((1.0, 2.0, 3.0))
 
-    context = environment.bind(protocol)
-    await protocol.move_to_destination()
+    context = await environment.bind(protocol)
     check(environment.executed == [], "commands wait until start")
     environment.start()
     check(protocol.notifications == ["started", "position: (1.0, 2.0, 3.0)"],

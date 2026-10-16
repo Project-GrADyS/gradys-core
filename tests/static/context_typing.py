@@ -1,4 +1,4 @@
-"""Type-check the context handles and synchronous protocol contract."""
+"""Type-check the context handles and asynchronous protocol contract."""
 
 from typing import assert_type
 
@@ -12,7 +12,7 @@ from gradys_core.protocol import (
 
 
 class Example(BaseProtocol):
-    def run(self, context: ProtocolContext) -> None:
+    async def run(self, context: ProtocolContext) -> None:
         command = context.require_command(GotoCoords)
         event = context.require_event(PositionUpdate)
         assert_type(command, CommandHandle[GotoCoords])
@@ -32,6 +32,6 @@ class Example(BaseProtocol):
         pass
 
 
-class AsyncExample(BaseProtocol):
-    async def run(self, context: ProtocolContext) -> None:  # type: ignore[override]
+class SyncExample(BaseProtocol):
+    def run(self, context: ProtocolContext) -> None:  # type: ignore[override]
         pass

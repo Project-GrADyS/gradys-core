@@ -86,10 +86,10 @@ class MockEnvironment:
         self._draining = False
         self.executed: list[BaseCommand] = []
 
-    def bind(self, protocol: BaseProtocol) -> ProtocolContext:
+    async def bind(self, protocol: BaseProtocol) -> ProtocolContext:
         """Run the protocol with an available context and return that context."""
         context = ProtocolContext(Connection(self))
-        protocol.run(context)
+        await protocol.run(context)
         return context
 
     def check_command(self, command_type: type[BaseCommand]) -> bool:

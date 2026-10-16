@@ -2,8 +2,8 @@
 
 An extensible, typed protocol interface for simulation and embedded execution
 environments. Protocols use commands, events, and awaited queries through
-an environment-provided `ProtocolContext`. Protocol setup, capability checks,
-and event subscriptions are synchronous; command sends and query requests are async.
+an environment-provided `ProtocolContext`. Protocol execution, command sends,
+and query requests are async; capability checks and event subscriptions are synchronous.
 
 ## Implement a protocol
 
@@ -21,7 +21,7 @@ class MoveProtocol(BaseProtocol):
         self.destination = destination
         self.positions: list[PositionUpdate] = []
 
-    def run(self, context: ProtocolContext) -> None:
+    async def run(self, context: ProtocolContext) -> None:
         context.require_event(PositionUpdate).subscribe(self.positions.append)
         self.move = context.require_command(GotoCoords)
 
@@ -49,13 +49,19 @@ from gradys_core.protocol import ProtocolContext
 # environment is an adapter implementing gradys_core.environment.Environment.
 protocol = MoveProtocol((1.0, 2.0, 3.0))
 context = ProtocolContext(Connection(environment))
-protocol.run(context)
-asyncio.run(protocol.move_to_destination())
+
+
+async def main() -> None:
+    await protocol.run(context)
+    await protocol.move_to_destination()
+
+
+asyncio.run(main())
 ```
 
 `Connection(environment)` is ready immediately. There is no injection step or
 buffer/replay phase. Awaited sends are forwarded in await order. The environment
-chooses when to invoke `run`, execute accepted commands, and deliver lifecycle
+chooses when to await `run`, execute accepted commands, and deliver lifecycle
 and other events. Core does not enforce single invocation or roll back effects.
 
 Each `require_*` validates support immediately and raises `ProtocolSetUpException`
@@ -84,7 +90,7 @@ timeouts; simultaneous requests may receive the same event.
 ## Migrating from constructor-time operations
 
 Move `self.require_*` calls and environment operations from `__init__` to
-`run(self, context: ProtocolContext)`, using `context.require_*`. Pass the context
+`async def run(self, context: ProtocolContext)`, using `context.require_*`. Pass the context
 to plugins instead of the protocol. Replace `_inject(environment)` with the
 explicit construction and invocation above. Register callbacks before sending
 commands whose immediate events they need to receive.

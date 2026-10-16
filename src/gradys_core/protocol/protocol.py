@@ -14,8 +14,8 @@ class BaseProtocol(ABC):
     """
 
     @abstractmethod
-    def run(self, context: ProtocolContext) -> None:
-        """Execute synchronously using the supplied context.
+    async def run(self, context: ProtocolContext) -> None:
+        """Execute asynchronously using the supplied context.
 
         Implementations obtain handles from context and may retain them for
         event callbacks after run returns. Errors propagate to the caller;

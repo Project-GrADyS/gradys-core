@@ -67,7 +67,7 @@ class LifecycleProtocol(BaseProtocol):
         """Initialize local state."""
         self.notifications: list[str] = []
 
-    def run(self, context: ProtocolContext) -> None:
+    async def run(self, context: ProtocolContext) -> None:
         """Register lifecycle handling and initialize the plugin."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         self.plugin = MovementPlugin(context, (1.0, 2.0, 3.0))
@@ -92,7 +92,7 @@ class SharedMovementProtocol(BaseProtocol):
         self.notifications: list[str] = []
         self.log: list[str] = []  # Shared with the plugin to record delivery order.
 
-    def run(self, context: ProtocolContext) -> None:
+    async def run(self, context: ProtocolContext) -> None:
         """Register subscriptions and movement through the shared context."""
         context.require_event(SimulationInitializationEvent).subscribe(self.on_start)
         context.require_event(PositionUpdate).subscribe(self.on_position)
@@ -115,7 +115,7 @@ async def disjoint() -> None:
     print("Disjoint: plugin adds mobility to a lifecycle-only protocol")
     environment = MockEnvironment()
     protocol = LifecycleProtocol()
-    environment.bind(protocol)
+    await environment.bind(protocol)
     await protocol.plugin.move_to_destination()
     environment.start()
     check(protocol.notifications == ["started"], "protocol gets only its own events")
@@ -124,7 +124,7 @@ async def disjoint() -> None:
 
     rejected = LifecycleProtocol()
     try:
-        MockEnvironment(mobility=False).bind(rejected)
+        await MockEnvironment(mobility=False).bind(rejected)
     except ProtocolSetUpException as error:
         check("GotoCoords" in error.message or "PositionUpdate" in error.message,
               "missing plugin capability rejects the protocol")
@@ -137,7 +137,7 @@ async def intersection() -> None:
     print("\nIntersection: protocol and plugin share PositionUpdate and GotoCoords")
     environment = MockEnvironment()
     protocol = SharedMovementProtocol()
-    environment.bind(protocol)
+    await environment.bind(protocol)
     await protocol.move.send(GotoCoords(1.0, 2.0, 3.0))
     await protocol.plugin.move_to_destination()
     environment.start()
