@@ -1,11 +1,12 @@
 """Lifecycle events provided by the environment."""
 
+from dataclasses import dataclass
 from typing import ClassVar
 
-from gradys_core.primitives import BaseEvent, EventId, environment_event
+from gradys_core.primitives import BaseEvent, EventId
 
 
-@environment_event
+@dataclass(frozen=True, slots=True)
 class SimulationInitializationEvent(BaseEvent):
     """Notify a protocol that its environment lifecycle has begun.
 

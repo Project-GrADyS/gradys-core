@@ -1,11 +1,12 @@
 """Mobility observations published by an environment."""
 
+from dataclasses import dataclass
 from typing import ClassVar
 
-from gradys_core.primitives import BaseEvent, EventId, environment_event
+from gradys_core.primitives import BaseEvent, EventId
 
 
-@environment_event
+@dataclass(frozen=True, slots=True)
 class PositionUpdate(BaseEvent):
     """Observe a position in the same Cartesian frame as ``GotoCoords``.
 
